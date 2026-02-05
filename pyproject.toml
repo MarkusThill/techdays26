@@ -42,7 +42,7 @@ dev = [
 ]
 
 lab1 = [
-    "bitbully[gui]",
+    "bitbully[gui]>=0.0.75",
     "numpy",
 ]
 
