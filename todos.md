@@ -2,6 +2,7 @@
 ---
 - Try Re-training from scratch
 - Evaluate performance during training (against random and partially random agents)
+- Allow fix match combinations for GameArena (or skip certain combinations)
 - Refactorings: Notebooks -> codebase
 - Unit Tests for refactored classes necessary.
 - Docstrings + ruff + mypy/pyrefly/ty linting
@@ -9,6 +10,7 @@
 
 # BitBully TODOs:
 - Reset function for Board
+- Tree-search with random rollout
 - expose winningMoves to pybind
 - get onehot move masks from move generation
 - play fast move using onehot move mask

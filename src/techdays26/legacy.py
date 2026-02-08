@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from typing import Protocol
 import bitbully
 from bitbully.agent_interface import Connect4Agent
+
 
 def play_match(
     agent_yellow: Connect4Agent,
@@ -12,8 +12,7 @@ def play_match(
     max_plies: int = 42,
     verbose: int = 0,
 ) -> int:
-    """
-    Play a full game between two agents on your BitBully `Board`.
+    """Play a full game between two agents on your BitBully `Board`.
 
     Returns:
         0 -> draw
@@ -46,7 +45,9 @@ def play_match(
         ok = board.play(move)
         if not ok:
             # `play()` returns False on illegal moves; we already checked, so this would indicate a bug.
-            raise RuntimeError(f"Board.play({move}) returned False although move was legal.")
+            raise RuntimeError(
+                f"Board.play({move}) returned False although move was legal."
+            )
 
         plies += 1
 

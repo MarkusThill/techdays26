@@ -18,25 +18,29 @@ You can drop this module into your project and adapt naming/paths as needed.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from enum import Enum
 import hashlib
+import json
 import logging
 import random
 import time
+from dataclasses import asdict, dataclass, is_dataclass
+from enum import Enum
+from pathlib import Path
+from typing import Any
 
 from bitbully import Board
 from bitbully.agent_interface import Connect4Agent
-
 
 # -----------------------------
 # Public configuration + types
 # -----------------------------
 
+
 class Color(int, Enum):
     """Player color / identity mapping (matches `Board.current_player()`)."""
+
     YELLOW = 1  # Player 1, starts
-    RED = 2     # Player 2
+    RED = 2  # Player 2
 
 
 @dataclass(frozen=True, slots=True)
@@ -60,6 +64,7 @@ class TimeControl:
     Best-effort timeouts (no subprocess): we measure elapsed time and forfeit
     *after* `best_move()` returns if a limit is exceeded.
     """
+
     per_move_timeout_s: float | None = None
     per_game_budget_s: float | None = None
 
@@ -67,6 +72,7 @@ class TimeControl:
 @dataclass(frozen=True, slots=True)
 class ArenaConfig:
     """Configuration for running an arena tournament."""
+
     agents: tuple[AgentSpec, ...]
     n_games: int
     time_control: TimeControl = TimeControl()
@@ -89,6 +95,7 @@ class TerminationReason(str, Enum):
 @dataclass(frozen=True, slots=True)
 class GamePlayers:
     """Assignment for a single game."""
+
     yellow_id: str
     red_id: str
 
@@ -120,6 +127,7 @@ class MoveMeta:
 @dataclass(frozen=True, slots=True)
 class GameRecord:
     """Complete record of a single played game."""
+
     game_cfg: GameConfig
     moves: tuple[int, ...]
     move_meta: tuple[MoveMeta, ...]
@@ -132,6 +140,7 @@ class GameRecord:
 @dataclass(frozen=True, slots=True)
 class SkippedPairing:
     """Record a pairing that was not scheduled due to incompatible constraints."""
+
     agent_a: str
     agent_b: str
     reason: TerminationReason = TerminationReason.INCOMPATIBLE_CONSTRAINTS
@@ -144,6 +153,7 @@ class AggregateRow:
 
     eps values are the epsilons of the *agents assigned to those colors* in that game.
     """
+
     agent_yellow: str
     agent_red: str
     epsilon_yellow: float
@@ -157,22 +167,154 @@ class AggregateRow:
     exceptions: int
 
 
+def _to_jsonable(obj: Any) -> Any:
+    """Convert dataclasses/enums/tuples into JSON-serializable structures."""
+    if is_dataclass(obj):
+        return {k: _to_jsonable(v) for k, v in asdict(obj).items()}
+    if isinstance(obj, Enum):
+        return obj.value
+    if isinstance(obj, tuple):
+        return [_to_jsonable(x) for x in obj]
+    if isinstance(obj, list):
+        return [_to_jsonable(x) for x in obj]
+    if isinstance(obj, dict):
+        return {str(k): _to_jsonable(v) for k, v in obj.items()}
+    return obj
+
+
 @dataclass(frozen=True, slots=True)
 class ArenaResult:
     games: tuple[GameRecord, ...]
     aggregates: tuple[AggregateRow, ...]
     skipped: tuple[SkippedPairing, ...]
 
+    _SERDE_VERSION: int = 1  # class-level constant-ish (still stored due to dataclass)
+
+    def to_json_dict(self) -> dict[str, Any]:
+        """Return a JSON-serializable dict representing this result."""
+        return {
+            "version": self._SERDE_VERSION,
+            "result": _to_jsonable(self),
+        }
+
+    def to_json_str(self, *, indent: int = 2) -> str:
+        """Serialize this result to a JSON string."""
+        return json.dumps(self.to_json_dict(), indent=indent, ensure_ascii=False)
+
+    def save_json(self, path: str | Path, *, indent: int = 2) -> None:
+        """Save this result as JSON to `path`."""
+        path = Path(path)
+        path.write_text(self.to_json_str(indent=indent), encoding="utf-8")
+
+    @classmethod
+    def load_json(cls, path: str | Path) -> ArenaResult:
+        """Load an ArenaResult from a JSON file created by `save_json`."""
+        path = Path(path)
+        payload = json.loads(path.read_text(encoding="utf-8"))
+
+        version = payload.get("version")
+        if version != 1:
+            raise ValueError(f"Unsupported arena result version: {version}")
+
+        d = payload["result"]
+
+        def mk_game_players(x: dict[str, Any]) -> GamePlayers:
+            return GamePlayers(yellow_id=str(x["yellow_id"]), red_id=str(x["red_id"]))
+
+        def mk_game_config(x: dict[str, Any]) -> GameConfig:
+            return GameConfig(
+                players=mk_game_players(x["players"]),
+                epsilon_by_agent={
+                    str(k): float(v) for k, v in x["epsilon_by_agent"].items()
+                },
+                seed=int(x["seed"]),
+            )
+
+        def mk_move_meta(x: dict[str, Any]) -> MoveMeta:
+            return MoveMeta(
+                ply=int(x["ply"]),
+                player=Color(int(x["player"])),
+                agent_id=str(x["agent_id"]),
+                epsilon=float(x["epsilon"]),
+                move=int(x["move"]),
+                was_epsilon_random=bool(x["was_epsilon_random"]),
+                elapsed_s=float(x["elapsed_s"]),
+                remaining_budget_s=(
+                    None
+                    if x["remaining_budget_s"] is None
+                    else float(x["remaining_budget_s"])
+                ),
+                scores=(
+                    None
+                    if x.get("scores") is None
+                    else {int(k): int(v) for k, v in x["scores"].items()}
+                ),
+            )
+
+        def mk_game_record(x: dict[str, Any]) -> GameRecord:
+            return GameRecord(
+                game_cfg=mk_game_config(x["game_cfg"]),
+                moves=tuple(int(m) for m in x["moves"]),
+                move_meta=tuple(mk_move_meta(mm) for mm in x["move_meta"]),
+                winner=(None if x["winner"] is None else Color(int(x["winner"]))),
+                termination=TerminationReason(str(x["termination"])),
+                detail=(None if x.get("detail") is None else str(x["detail"])),
+            )
+
+        def mk_skipped_pairing(x: dict[str, Any]) -> SkippedPairing:
+            return SkippedPairing(
+                agent_a=str(x["agent_a"]),
+                agent_b=str(x["agent_b"]),
+                reason=TerminationReason(
+                    str(
+                        x.get(
+                            "reason", TerminationReason.INCOMPATIBLE_CONSTRAINTS.value
+                        )
+                    )
+                ),
+                detail=(None if x.get("detail") is None else str(x["detail"])),
+            )
+
+        def mk_aggregate_row(x: dict[str, Any]) -> AggregateRow:
+            return AggregateRow(
+                agent_yellow=str(x["agent_yellow"]),
+                agent_red=str(x["agent_red"]),
+                epsilon_yellow=float(x["epsilon_yellow"]),
+                epsilon_red=float(x["epsilon_red"]),
+                games=int(x["games"]),
+                yellow_wins=int(x["yellow_wins"]),
+                red_wins=int(x["red_wins"]),
+                draws=int(x["draws"]),
+                timeouts=int(x["timeouts"]),
+                illegal_moves=int(x["illegal_moves"]),
+                exceptions=int(x["exceptions"]),
+            )
+
+        return cls(
+            games=tuple(mk_game_record(gr) for gr in d["games"]),
+            aggregates=tuple(mk_aggregate_row(ar) for ar in d["aggregates"]),
+            skipped=tuple(mk_skipped_pairing(sp) for sp in d["skipped"]),
+        )
+
+
+# -----------------------------
+# Usage
+# -----------------------------
+# result = arena.run(cfg)
+# result.save_json("arena_result.json")
+# result2 = ArenaResult.load_json("arena_result.json")
+
 
 # -----------------------------
 # Example baseline agent
 # -----------------------------
 
+
 class RandomAgent:
     """Agent that plays a uniformly random legal move."""
 
     def score_all_moves(self, board: Board) -> dict[int, int]:
-        return {c: 0 for c in board.legal_moves()}
+        return dict.fromkeys(board.legal_moves(), 0)
 
     def best_move(self, board: Board) -> int:
         return random.choice(board.legal_moves())
@@ -181,6 +323,7 @@ class RandomAgent:
 # -----------------------------
 # Arena implementation
 # -----------------------------
+
 
 class BitBullyArena:
     def __init__(self) -> None:
@@ -198,7 +341,9 @@ class BitBullyArena:
                 raise ValueError(f"Agent {spec.agent_id}: epsilons must not be empty.")
             for eps in spec.epsilons:
                 if not (0.0 <= eps <= 1.0):
-                    raise ValueError(f"Agent {spec.agent_id}: epsilon must be in [0,1], got {eps}")
+                    raise ValueError(
+                        f"Agent {spec.agent_id}: epsilon must be in [0,1], got {eps}"
+                    )
 
         # Plan schedule:
         # for each unordered pairing (i<j), run both color swaps and all (eps_a, eps_b) combinations.
@@ -220,7 +365,9 @@ class BitBullyArena:
                             for k in range(cfg.n_games):
                                 planned_games.append(
                                     GameConfig(
-                                        players=GamePlayers(yellow_id=a.agent_id, red_id=b.agent_id),
+                                        players=GamePlayers(
+                                            yellow_id=a.agent_id, red_id=b.agent_id
+                                        ),
                                         epsilon_by_agent=eps_map,
                                         seed=_derive_game_seed(
                                             cfg.seed,
@@ -250,7 +397,9 @@ class BitBullyArena:
                             for k in range(cfg.n_games):
                                 planned_games.append(
                                     GameConfig(
-                                        players=GamePlayers(yellow_id=b.agent_id, red_id=a.agent_id),
+                                        players=GamePlayers(
+                                            yellow_id=b.agent_id, red_id=a.agent_id
+                                        ),
                                         epsilon_by_agent=eps_map,
                                         seed=_derive_game_seed(
                                             cfg.seed,
@@ -276,13 +425,16 @@ class BitBullyArena:
                             )
 
         # Map agent_id -> agent instance
-        agent_by_id: dict[str, Connect4Agent] = {s.agent_id: s.agent for s in agent_specs}
+        agent_by_id: dict[str, Connect4Agent] = {
+            s.agent_id: s.agent for s in agent_specs
+        }
 
         # Optional progress bar
         iterator = planned_games
         if cfg.use_tqdm:
             try:
                 from tqdm import tqdm  # type: ignore[import-not-found]
+
                 iterator = tqdm(planned_games, desc="BitBullyArena", unit="game")
             except Exception:
                 iterator = planned_games
@@ -334,7 +486,11 @@ class BitBullyArena:
             player_int = board.current_player()
             player = Color(player_int)
 
-            agent_id = game_cfg.players.yellow_id if player == Color.YELLOW else game_cfg.players.red_id
+            agent_id = (
+                game_cfg.players.yellow_id
+                if player == Color.YELLOW
+                else game_cfg.players.red_id
+            )
             agent = yellow if player == Color.YELLOW else red
             eps = game_cfg.epsilon_by_agent[agent_id]
 
@@ -362,7 +518,9 @@ class BitBullyArena:
                         except Exception as e:
                             logger.warning(
                                 "score_all_moves() failed for agent=%s at ply=%d: %r",
-                                agent_id, ply, e,
+                                agent_id,
+                                ply,
+                                e,
                             )
                             scores = None
 
@@ -372,7 +530,10 @@ class BitBullyArena:
                 winner = Color.RED if player == Color.YELLOW else Color.YELLOW
                 logger.warning(
                     "Agent exception: agent=%s player=%s ply=%d err=%r",
-                    agent_id, player.name, ply, e,
+                    agent_id,
+                    player.name,
+                    ply,
+                    e,
                 )
                 return GameRecord(
                     game_cfg=game_cfg,
@@ -380,7 +541,7 @@ class BitBullyArena:
                     move_meta=tuple(meta),
                     winner=winner,
                     termination=TerminationReason.EXCEPTION,
-                    detail=f"agent={agent_id} err={repr(e)}",
+                    detail=f"agent={agent_id} err={e!r}",
                 )
 
             # Time accounting (best-effort)
@@ -404,17 +565,26 @@ class BitBullyArena:
                     move=int(move),
                     was_epsilon_random=was_eps,
                     elapsed_s=float(elapsed),
-                    remaining_budget_s=(None if remaining_budget is None else float(remaining_budget)),
+                    remaining_budget_s=(
+                        None if remaining_budget is None else float(remaining_budget)
+                    ),
                     scores=scores,
                 )
             )
 
             # Timeout checks (best-effort: we can only decide now)
-            if time_control.per_move_timeout_s is not None and elapsed > time_control.per_move_timeout_s:
+            if (
+                time_control.per_move_timeout_s is not None
+                and elapsed > time_control.per_move_timeout_s
+            ):
                 winner = Color.RED if player == Color.YELLOW else Color.YELLOW
                 logger.warning(
                     "Per-move timeout: agent=%s player=%s ply=%d elapsed=%.6f limit=%.6f",
-                    agent_id, player.name, ply, elapsed, time_control.per_move_timeout_s,
+                    agent_id,
+                    player.name,
+                    ply,
+                    elapsed,
+                    time_control.per_move_timeout_s,
                 )
                 return GameRecord(
                     game_cfg=game_cfg,
@@ -432,7 +602,10 @@ class BitBullyArena:
                 winner = Color.RED if player == Color.YELLOW else Color.YELLOW
                 logger.warning(
                     "Per-game budget exceeded: agent=%s player=%s ply=%d remaining=%.6f",
-                    agent_id, player.name, ply, remaining_budget,
+                    agent_id,
+                    player.name,
+                    ply,
+                    remaining_budget,
                 )
                 return GameRecord(
                     game_cfg=game_cfg,
@@ -448,7 +621,10 @@ class BitBullyArena:
                 winner = Color.RED if player == Color.YELLOW else Color.YELLOW
                 logger.warning(
                     "Illegal move: agent=%s player=%s ply=%d move=%r",
-                    agent_id, player.name, ply, move,
+                    agent_id,
+                    player.name,
+                    ply,
+                    move,
                 )
                 return GameRecord(
                     game_cfg=game_cfg,
@@ -456,7 +632,7 @@ class BitBullyArena:
                     move_meta=tuple(meta),
                     winner=winner,
                     termination=TerminationReason.ILLEGAL_MOVE,
-                    detail=f"illegal move: agent={agent_id} move={repr(move)}",
+                    detail=f"illegal move: agent={agent_id} move={move!r}",
                 )
 
             # Apply move
@@ -466,7 +642,10 @@ class BitBullyArena:
                 winner = Color.RED if player == Color.YELLOW else Color.YELLOW
                 logger.warning(
                     "Move application failed: agent=%s player=%s ply=%d move=%r",
-                    agent_id, player.name, ply, move,
+                    agent_id,
+                    player.name,
+                    ply,
+                    move,
                 )
                 return GameRecord(
                     game_cfg=game_cfg,
@@ -474,7 +653,7 @@ class BitBullyArena:
                     move_meta=tuple(meta),
                     winner=winner,
                     termination=TerminationReason.ILLEGAL_MOVE,
-                    detail=f"play() failed despite is_legal_move: agent={agent_id} move={repr(move)}",
+                    detail=f"play() failed despite is_legal_move: agent={agent_id} move={move!r}",
                 )
 
             moves.append(int(move))
@@ -515,6 +694,7 @@ class BitBullyArena:
 # -----------------------------
 # Helpers
 # -----------------------------
+
 
 def _derive_game_seed(
     global_seed: int,
@@ -601,5 +781,12 @@ def _aggregate_games(games: list[GameRecord]) -> list[AggregateRow]:
         )
 
     # Stable ordering for convenience
-    out.sort(key=lambda row: (row.agent_yellow, row.agent_red, row.epsilon_yellow, row.epsilon_red))
+    out.sort(
+        key=lambda row: (
+            row.agent_yellow,
+            row.agent_red,
+            row.epsilon_yellow,
+            row.epsilon_red,
+        )
+    )
     return out

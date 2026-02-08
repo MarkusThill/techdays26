@@ -1,44 +1,38 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-from pathlib import Path
 import io
 import json
-import zipfile
-
-import numpy as np
-
-from dataclasses import dataclass
-from pathlib import Path
 import math
 import re
 import zipfile
+from dataclasses import dataclass
+from pathlib import Path
 
 import numpy as np
 
 # If you want a static type check against the Protocol:
-import bitbully
-from bitbully.agent_interface import Connect4Agent
-from bitbully import Board
 
 
 # =============================================================================
 # Models
 # =============================================================================
 
+
 @dataclass(frozen=True, slots=True)
 class TupleLUT:
     """One n-tuple LUT (keeps both original + mirrored index sets)."""
+
     n: int
     m: int
-    idxs: np.ndarray        # (n,), original indices (mirror1)
-    idxs_m: np.ndarray      # (n,), mirrored indices (mirror2)
-    lut: np.ndarray         # (P**n,), float64
+    idxs: np.ndarray  # (n,), original indices (mirror1)
+    idxs_m: np.ndarray  # (n,), mirrored indices (mirror2)
+    lut: np.ndarray  # (P**n,), float64
 
 
 @dataclass(frozen=True, slots=True)
 class PlayerWeights:
     """Weights file for one 'player to move' (p0 or p1)."""
+
     t: int
     p: int
     luts: tuple[TupleLUT, ...]
@@ -47,6 +41,7 @@ class PlayerWeights:
 @dataclass(frozen=True, slots=True)
 class TwoPlayerWeights:
     """Weights for both players to move: p0 (yellow), p1 (red)."""
+
     p0: PlayerWeights
     p1: PlayerWeights
 
@@ -62,10 +57,11 @@ class TwoPlayerWeights:
 # Parsing helpers (text -> TwoPlayerWeights)
 # =============================================================================
 
+
 @dataclass(slots=True)
 class Block:
     text: str | list[str]
-    children: list["Block"]
+    children: list[Block]
 
 
 _ALLOWED_CHARS = re.compile(r"^[\s0-9+\-\.eE{}]*$")
@@ -84,7 +80,9 @@ def _validate_text(text: str) -> None:
     if not _ALLOWED_CHARS.match(text):
         for i, ch in enumerate(text):
             if not re.match(r"[\s0-9+\-\.eE{}]", ch):
-                raise ValueError(f"Invalid character {ch!r} (ord={ord(ch)}) at position {i}")
+                raise ValueError(
+                    f"Invalid character {ch!r} (ord={ord(ch)}) at position {i}"
+                )
         raise ValueError("Invalid character(s) found.")
 
 
@@ -135,23 +133,37 @@ def _block_to_tuple_lut(block: Block, *, p: int, int_dtype=np.int32) -> TupleLUT
     if not isinstance(block.text, list) or len(block.text) != 2:
         raise ValueError(f"Expected tuple header tokens [N, M], got: {block.text!r}")
     if len(block.children) != 3:
-        raise ValueError(f"Expected 3 children (set, mirror, weights), got {len(block.children)}")
+        raise ValueError(
+            f"Expected 3 children (set, mirror, weights), got {len(block.children)}"
+        )
 
     n = int(block.text[0])
     m = int(block.text[1])
 
     b_set, b_mirror, b_w = block.children
-    if not isinstance(b_set.text, list) or not isinstance(b_mirror.text, list) or not isinstance(b_w.text, list):
-        raise ValueError("Child blocks must be token lists. Did you call _split_tokens_inplace()?")
+    if (
+        not isinstance(b_set.text, list)
+        or not isinstance(b_mirror.text, list)
+        or not isinstance(b_w.text, list)
+    ):
+        raise ValueError(
+            "Child blocks must be token lists. Did you call _split_tokens_inplace()?"
+        )
 
     if len(b_set.text) != n:
-        raise ValueError(f"Sample set length mismatch: expected {n}, got {len(b_set.text)}")
+        raise ValueError(
+            f"Sample set length mismatch: expected {n}, got {len(b_set.text)}"
+        )
     if len(b_mirror.text) != n:
-        raise ValueError(f"Mirrored set length mismatch: expected {n}, got {len(b_mirror.text)}")
+        raise ValueError(
+            f"Mirrored set length mismatch: expected {n}, got {len(b_mirror.text)}"
+        )
 
     expected_w = int(p**n)
     if len(b_w.text) != expected_w:
-        raise ValueError(f"LUT length mismatch: expected {expected_w} (= {p}^{n}), got {len(b_w.text)}")
+        raise ValueError(
+            f"LUT length mismatch: expected {expected_w} (= {p}^{n}), got {len(b_w.text)}"
+        )
 
     return TupleLUT(
         n=n,
@@ -165,7 +177,9 @@ def _block_to_tuple_lut(block: Block, *, p: int, int_dtype=np.int32) -> TupleLUT
 class TDWeightsLoader:
     """Load TD-agent weights from `p0.txt` and `p1.txt` (directory or zip)."""
 
-    def __init__(self, *, int_dtype=np.int32, validate: bool = True, strict_t: bool = True) -> None:
+    def __init__(
+        self, *, int_dtype=np.int32, validate: bool = True, strict_t: bool = True
+    ) -> None:
         self._int_dtype = int_dtype
         self._validate = validate
         self._strict_t = strict_t
@@ -179,16 +193,23 @@ class TDWeightsLoader:
         _split_tokens_inplace(root)
 
         if not root.children:
-            raise ValueError("No top-level block found. Expected file to start with '{'.")
+            raise ValueError(
+                "No top-level block found. Expected file to start with '{'."
+            )
         file_block = root.children[0]
 
         if not isinstance(file_block.text, list) or len(file_block.text) < 2:
-            raise ValueError(f"Expected file header tokens [T, P], got: {file_block.text!r}")
+            raise ValueError(
+                f"Expected file header tokens [T, P], got: {file_block.text!r}"
+            )
 
         t = int(file_block.text[0])
         p = int(file_block.text[1])
 
-        luts = tuple(_block_to_tuple_lut(b, p=p, int_dtype=self._int_dtype) for b in file_block.children)
+        luts = tuple(
+            _block_to_tuple_lut(b, p=p, int_dtype=self._int_dtype)
+            for b in file_block.children
+        )
 
         if self._validate and self._strict_t and t != len(luts):
             raise ValueError(f"T mismatch: header T={t}, parsed tuples={len(luts)}")
@@ -204,11 +225,15 @@ class TDWeightsLoader:
             try:
                 data = zf.read(member)
             except KeyError as e:
-                raise FileNotFoundError(f"{member!r} not found in zip {str(zip_path)!r}") from e
+                raise FileNotFoundError(
+                    f"{member!r} not found in zip {str(zip_path)!r}"
+                ) from e
         raw = data.decode("utf-8", errors="strict")
         return self._load_from_text(raw)
 
-    def load_two_player(self, directory: str | Path, *, p0: str = "p0.txt", p1: str = "p1.txt") -> TwoPlayerWeights:
+    def load_two_player(
+        self, directory: str | Path, *, p0: str = "p0.txt", p1: str = "p1.txt"
+    ) -> TwoPlayerWeights:
         d = Path(directory)
         w0 = self.load_file(d / p0)
         w1 = self.load_file(d / p1)
@@ -234,10 +259,13 @@ class TDWeightsLoader:
 # Board encoding (7 columns x 6 rows, bottom->top) -> flat 42 state array
 # =============================================================================
 
+
 def board_cols_to_flat_features(board_cols: list[list[int]]) -> np.ndarray:
     """Convert board_cols[col][row] into 42-length state array with P=4 encoding."""
     if len(board_cols) != 7 or any(len(col) != 6 for col in board_cols):
-        raise ValueError("Expected board_cols shape (7, 6): 7 columns each with 6 cells.")
+        raise ValueError(
+            "Expected board_cols shape (7, 6): 7 columns each with 6 cells."
+        )
 
     flat = np.zeros(42, dtype=np.int8)
 
@@ -258,7 +286,9 @@ def board_cols_to_flat_features(board_cols: list[list[int]]) -> np.ndarray:
             elif cell == 2:
                 flat[idx] = 2
             else:
-                flat[idx] = 3 if (reachable_row is not None and row == reachable_row) else 0
+                flat[idx] = (
+                    3 if (reachable_row is not None and row == reachable_row) else 0
+                )
 
     return flat
 
@@ -266,6 +296,7 @@ def board_cols_to_flat_features(board_cols: list[list[int]]) -> np.ndarray:
 # =============================================================================
 # TD evaluator
 # =============================================================================
+
 
 def _lut_index_from_states(states: np.ndarray, p: int) -> int:
     powers = p ** np.arange(states.size, dtype=np.int64)
@@ -298,6 +329,7 @@ class TDEvaluator:
 # Agent that satisfies the Connect4Agent Protocol
 # =============================================================================
 
+
 class TDConnect4Agent:
     """TD n-tuple agent compatible with `Connect4Agent` Protocol.
 
@@ -327,9 +359,13 @@ class TDConnect4Agent:
             after = board.play_on_copy(col)
             next_player = after.current_player() - 1
             if next_player not in (0, 1):
-                raise ValueError(f"Unexpected current_player() after move: {after.current_player()}")
+                raise ValueError(
+                    f"Unexpected current_player() after move: {after.current_player()}"
+                )
 
-            raw = self._eval.value(board_cols=after.to_array(), player_to_move=next_player)
+            raw = self._eval.value(
+                board_cols=after.to_array(), player_to_move=next_player
+            )
             score = self._eval.to_score(raw)
 
             # normalize to "bigger is better for side-to-move"
@@ -409,8 +445,7 @@ def _read_npy_from_zip(zf: zipfile.ZipFile, name: str) -> np.ndarray:
 
 
 def export_two_player_weights_zip(path: str | Path, both: TwoPlayerWeights) -> None:
-    """
-    Export `both` (TwoPlayerWeights) to a single zip file containing:
+    """Export `both` (TwoPlayerWeights) to a single zip file containing:
       - meta.json
       - arrays as .npy files
 
@@ -447,15 +482,13 @@ def export_two_player_weights_zip(path: str | Path, both: TwoPlayerWeights) -> N
                 _write_npy_to_zip(zf, lut_name, tup.lut)
 
                 # Store the small scalar metadata in JSON
-                player_meta["luts"].append(
-                    {
-                        "n": int(tup.n),
-                        "m": int(tup.m),
-                        "idxs": idxs_name,
-                        "idxs_m": idxs_m_name,
-                        "lut": lut_name,
-                    }
-                )
+                player_meta["luts"].append({
+                    "n": int(tup.n),
+                    "m": int(tup.m),
+                    "idxs": idxs_name,
+                    "idxs_m": idxs_m_name,
+                    "lut": lut_name,
+                })
 
             meta["players"][tag] = player_meta
 
@@ -463,7 +496,9 @@ def export_two_player_weights_zip(path: str | Path, both: TwoPlayerWeights) -> N
         write_player("p1", both.p1)
 
         # Write meta.json last
-        zf.writestr("meta.json", json.dumps(meta, indent=2, sort_keys=True).encode("utf-8"))
+        zf.writestr(
+            "meta.json", json.dumps(meta, indent=2, sort_keys=True).encode("utf-8")
+        )
 
 
 def import_two_player_weights_zip(
@@ -473,8 +508,7 @@ def import_two_player_weights_zip(
     validate: bool = True,
     strict_t: bool = True,
 ) -> TwoPlayerWeights:
-    """
-    Import TwoPlayerWeights from the zip written by export_two_player_weights_zip().
+    """Import TwoPlayerWeights from the zip written by export_two_player_weights_zip().
 
     Args:
         int_dtype: dtype for idx arrays (e.g. np.int32).
@@ -509,15 +543,25 @@ def import_two_player_weights_zip(
                 n = int(entry["n"])
                 m = int(entry["m"])
 
-                idxs = _read_npy_from_zip(zf, entry["idxs"]).astype(int_dtype, copy=False)
-                idxs_m = _read_npy_from_zip(zf, entry["idxs_m"]).astype(int_dtype, copy=False)
-                lut = _read_npy_from_zip(zf, entry["lut"]).astype(np.float64, copy=False)
+                idxs = _read_npy_from_zip(zf, entry["idxs"]).astype(
+                    int_dtype, copy=False
+                )
+                idxs_m = _read_npy_from_zip(zf, entry["idxs_m"]).astype(
+                    int_dtype, copy=False
+                )
+                lut = _read_npy_from_zip(zf, entry["lut"]).astype(
+                    np.float64, copy=False
+                )
 
                 if validate:
                     if idxs.ndim != 1 or idxs.size != n:
-                        raise ValueError(f"{tag}: idxs shape mismatch (expected ({n},), got {idxs.shape}).")
+                        raise ValueError(
+                            f"{tag}: idxs shape mismatch (expected ({n},), got {idxs.shape})."
+                        )
                     if idxs_m.ndim != 1 or idxs_m.size != n:
-                        raise ValueError(f"{tag}: idxs_m shape mismatch (expected ({n},), got {idxs_m.shape}).")
+                        raise ValueError(
+                            f"{tag}: idxs_m shape mismatch (expected ({n},), got {idxs_m.shape})."
+                        )
                     expected = int(p**n)
                     if lut.ndim != 1 or lut.size != expected:
                         raise ValueError(
