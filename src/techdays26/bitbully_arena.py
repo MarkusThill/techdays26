@@ -790,3 +790,107 @@ def _aggregate_games(games: list[GameRecord]) -> list[AggregateRow]:
         )
     )
     return out
+
+
+from __future__ import annotations
+
+
+def format_aggregate_table(result: Any) -> str:
+    """Builds a nicely formatted table for `result.aggregates` and adds a final score:
+      score = (+1 * yellow_wins) + (-1 * red_wins) + (0 * draws) = yellow_wins - red_wins
+
+    Returns:
+        A single string (ready to print or write to a file).
+    """
+    rows: list[dict[str, Any]] = []
+    for r in result.aggregates:
+        score = int(r.yellow_wins) - int(r.red_wins)
+
+        rows.append({
+            "yellow": r.agent_yellow,
+            "red": r.agent_red,
+            "eps_y": float(r.epsilon_yellow),
+            "eps_r": float(r.epsilon_red),
+            "games": int(r.games),
+            "Y_w": int(r.yellow_wins),
+            "R_w": int(r.red_wins),
+            "D": int(r.draws),
+            "score": score,
+            "avg": (score / int(r.games))
+            if int(r.games)
+            else 0.0,  # normalized [-1, 1]
+            "timeouts": int(getattr(r, "timeouts", 0)),
+            "illegal": int(getattr(r, "illegal_moves", 0)),
+            "exc": int(getattr(r, "exceptions", 0)),
+        })
+
+    # Column order + formatting
+    cols = [
+        ("yellow", "Y", "{}"),
+        ("red", "R", "{}"),
+        ("eps_y", "εY", "{:.2f}"),
+        ("eps_r", "εR", "{:.2f}"),
+        ("games", "G", "{:d}"),
+        ("Y_w", "Ywin", "{:d}"),
+        ("R_w", "Rwin", "{:d}"),
+        ("D", "Draw", "{:d}"),
+        ("score", "Score", "{:d}"),
+        ("avg", "Avg", "{:+.3f}"),
+        ("timeouts", "TO", "{:d}"),
+        ("illegal", "Ill", "{:d}"),
+        ("exc", "Exc", "{:d}"),
+    ]
+
+    # Pre-render cells to compute widths
+    rendered: list[list[str]] = []
+    for row in rows:
+        rendered.append([fmt.format(row[key]) for key, _, fmt in cols])
+
+    widths = []
+    for j, (_, header, _) in enumerate(cols):
+        w = len(header)
+        for i in range(len(rendered)):
+            w = max(w, len(rendered[i][j]))
+        widths.append(w)
+
+    def pack_line(parts: list[str]) -> str:
+        return " | ".join(p.ljust(widths[i]) for i, p in enumerate(parts))
+
+    header = pack_line([h for _, h, _ in cols])
+    sep = "-+-".join("-" * w for w in widths)
+
+    lines = [header, sep]
+    for cells in rendered:
+        lines.append(pack_line(cells))
+
+    return "\n".join(lines)
+
+
+def get_table_legend():
+    legend = (
+        "Table legend:\n"
+        "Y      = Yellow agent ID\n"
+        "R      = Red agent ID\n"
+        "εY     = Epsilon value used for the Yellow agent\n"
+        "εR     = Epsilon value used for the Red agent\n"
+        "G      = Number of games played for this pairing/configuration\n"
+        "Ywin   = Number of games won by Yellow\n"
+        "Rwin   = Number of games won by Red\n"
+        "Draw   = Number of draws\n"
+        "Score  = Final score = Ywin - Rwin  (Yellow win = +1, Red win = -1, Draw = 0)\n"
+        "Avg    = Normalized score per game = Score / G  (range [-1, +1])\n"
+        "TO     = Games lost due to timeout\n"
+        "Ill    = Games lost due to illegal moves\n"
+        "Exc    = Games lost due to exceptions\n"
+    )
+    return legend
+
+
+# print(legend)
+
+# Usage:
+# table_str = format_aggregate_table(result)
+# print(table_str)
+# or write it to a file:
+# with open("arena_summary.txt", "a", encoding="utf-8") as f:
+#     f.write(table_str + "\n")

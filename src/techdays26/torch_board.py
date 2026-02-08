@@ -555,3 +555,29 @@ class BoardBatch:
 
     def done(self) -> torch.Tensor:
         return self.has_win() | (self.moves_left <= 0)
+
+    @classmethod
+    def clear_caches(cls) -> None:
+        cls._WEIGHTS_CACHE.clear()
+        cls._PATTERN_MASKS_CACHE.clear()
+        cls._COL_MASKS_CACHE.clear()
+
+
+def move_mask_to_column(mv: int, *, column_bit_offset: int = 9) -> int:
+    """Return the column index (0..6) for a one-hot move mask.
+
+    Args:
+        mv: int64 bitboard with exactly one bit set (landing square).
+        column_bit_offset: Bit stride between columns (default: 9).
+
+    Returns:
+        int: Column index (0..6).
+
+    Raises:
+        ValueError: If mv == 0 or mv has more than one bit set.
+    """
+    if mv == 0 or (mv & (mv - 1)) != 0:
+        raise ValueError(f"mv must be one-hot, got {mv:#x}")
+
+    bit_index = mv.bit_length() - 1
+    return bit_index // column_bit_offset
