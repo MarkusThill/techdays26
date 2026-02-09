@@ -1,3 +1,5 @@
+
+
 """BitBullyArena: a lightweight Connect-4 arena for pitting agents against each other.
 
 Design goals (v1):
@@ -16,8 +18,8 @@ Assumptions (based on your Board semantics):
 You can drop this module into your project and adapt naming/paths as needed.
 """
 
-from __future__ import annotations
 
+from __future__ import annotations
 import hashlib
 import json
 import logging
@@ -790,10 +792,6 @@ def _aggregate_games(games: list[GameRecord]) -> list[AggregateRow]:
         )
     )
     return out
-
-
-from __future__ import annotations
-
 
 def format_aggregate_table(result: Any) -> str:
     """Builds a nicely formatted table for `result.aggregates` and adds a final score:
