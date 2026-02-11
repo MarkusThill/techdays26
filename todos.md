@@ -7,6 +7,9 @@
 - Unit Tests for refactored classes necessary.
 - Docstrings + ruff + mypy/pyrefly/ty linting
 - Investigate efficient way to implement eligibility traces (see Sutton & Barto)
+- final learning rate -> do not converge to 0
+- look at the the non-zero updates
+- implement own update rule
 
 # BitBully TODOs:
 - Reset function for Board

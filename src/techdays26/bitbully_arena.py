@@ -861,7 +861,7 @@ def format_aggregate_table(result: Any) -> str:
     for cells in rendered:
         lines.append(pack_line(cells))
 
-    return "\n".join(lines)
+    return "\n".join(lines) + "\n"
 
 
 def get_table_legend():
