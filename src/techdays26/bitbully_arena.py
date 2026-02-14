@@ -1,5 +1,3 @@
-
-
 """BitBullyArena: a lightweight Connect-4 arena for pitting agents against each other.
 
 Design goals (v1):
@@ -17,7 +15,6 @@ Assumptions (based on your Board semantics):
 
 You can drop this module into your project and adapt naming/paths as needed.
 """
-
 
 from __future__ import annotations
 import hashlib
@@ -60,6 +57,20 @@ class AgentSpec:
 
 
 @dataclass(frozen=True, slots=True)
+class Matchup:
+    """Explicit matchup: which agent plays yellow, which plays red.
+
+    Use this to specify exact constellations instead of the default all-vs-all
+    round-robin.  Example::
+
+        Matchup(yellow_id="bitbully", red_id="random")
+    """
+
+    yellow_id: str
+    red_id: str
+
+
+@dataclass(frozen=True, slots=True)
 class TimeControl:
     """Time controls for agents.
 
@@ -73,10 +84,18 @@ class TimeControl:
 
 @dataclass(frozen=True, slots=True)
 class ArenaConfig:
-    """Configuration for running an arena tournament."""
+    """Configuration for running an arena tournament.
+
+    When *matchups* is ``None`` (default), the arena generates a full
+    round-robin across all agents (both color assignments).
+    When *matchups* is provided, **only** those explicit constellations are
+    scheduled (each still crossed with the epsilon sweep from the respective
+    ``AgentSpec``).
+    """
 
     agents: tuple[AgentSpec, ...]
     n_games: int
+    matchups: tuple[Matchup, ...] | None = None
     time_control: TimeControl = TimeControl()
     seed: int = 0
 
@@ -347,88 +366,130 @@ class BitBullyArena:
                         f"Agent {spec.agent_id}: epsilon must be in [0,1], got {eps}"
                     )
 
-        # Plan schedule:
-        # for each unordered pairing (i<j), run both color swaps and all (eps_a, eps_b) combinations.
+        # Build lookup from agent_id -> AgentSpec
         agent_specs = list(cfg.agents)
+        spec_by_id: dict[str, AgentSpec] = {s.agent_id: s for s in agent_specs}
+
         skipped: list[SkippedPairing] = []
         planned_games: list[GameConfig] = []
 
-        for i in range(len(agent_specs)):
-            for j in range(i + 1, len(agent_specs)):
-                a = agent_specs[i]
-                b = agent_specs[j]
+        if cfg.matchups is not None:
+            # --- Explicit matchups mode ---
+            for mu in cfg.matchups:
+                if mu.yellow_id not in spec_by_id:
+                    raise ValueError(
+                        f"Matchup references unknown agent_id: {mu.yellow_id!r}"
+                    )
+                if mu.red_id not in spec_by_id:
+                    raise ValueError(
+                        f"Matchup references unknown agent_id: {mu.red_id!r}"
+                    )
+                y_spec = spec_by_id[mu.yellow_id]
+                r_spec = spec_by_id[mu.red_id]
 
-                for eps_a in a.epsilons:
-                    for eps_b in b.epsilons:
-                        eps_map = {a.agent_id: eps_a, b.agent_id: eps_b}
-
-                        # assignment 1: A yellow, B red
-                        if a.can_play(Color.YELLOW) and b.can_play(Color.RED):
-                            for k in range(cfg.n_games):
-                                planned_games.append(
-                                    GameConfig(
-                                        players=GamePlayers(
-                                            yellow_id=a.agent_id, red_id=b.agent_id
-                                        ),
-                                        epsilon_by_agent=eps_map,
-                                        seed=_derive_game_seed(
-                                            cfg.seed,
-                                            a.agent_id,
-                                            b.agent_id,
-                                            Color.YELLOW,
-                                            Color.RED,
-                                            eps_a,
-                                            eps_b,
-                                            k,
-                                        ),
-                                    )
-                                )
-                        else:
-                            skipped.append(
-                                SkippedPairing(
-                                    agent_a=a.agent_id,
-                                    agent_b=b.agent_id,
-                                    detail=(
-                                        f"Cannot assign {a.agent_id}=YELLOW and {b.agent_id}=RED under constraints."
+                for eps_y in y_spec.epsilons:
+                    for eps_r in r_spec.epsilons:
+                        eps_map = {mu.yellow_id: eps_y, mu.red_id: eps_r}
+                        for k in range(cfg.n_games):
+                            planned_games.append(
+                                GameConfig(
+                                    players=GamePlayers(
+                                        yellow_id=mu.yellow_id,
+                                        red_id=mu.red_id,
+                                    ),
+                                    epsilon_by_agent=eps_map,
+                                    seed=_derive_game_seed(
+                                        cfg.seed,
+                                        mu.yellow_id,
+                                        mu.red_id,
+                                        Color.YELLOW,
+                                        Color.RED,
+                                        eps_y,
+                                        eps_r,
+                                        k,
                                     ),
                                 )
                             )
+        else:
+            # --- Round-robin mode (default) ---
+            # For each unordered pairing (i<j), run both color swaps and
+            # all (eps_a, eps_b) combinations.
+            for i in range(len(agent_specs)):
+                for j in range(i + 1, len(agent_specs)):
+                    a = agent_specs[i]
+                    b = agent_specs[j]
 
-                        # assignment 2: B yellow, A red
-                        if b.can_play(Color.YELLOW) and a.can_play(Color.RED):
-                            for k in range(cfg.n_games):
-                                planned_games.append(
-                                    GameConfig(
-                                        players=GamePlayers(
-                                            yellow_id=b.agent_id, red_id=a.agent_id
-                                        ),
-                                        epsilon_by_agent=eps_map,
-                                        seed=_derive_game_seed(
-                                            cfg.seed,
-                                            a.agent_id,
-                                            b.agent_id,
-                                            Color.RED,
-                                            Color.YELLOW,
-                                            eps_a,
-                                            eps_b,
-                                            k,
+                    for eps_a in a.epsilons:
+                        for eps_b in b.epsilons:
+                            eps_map = {a.agent_id: eps_a, b.agent_id: eps_b}
+
+                            # assignment 1: A yellow, B red
+                            if a.can_play(Color.YELLOW) and b.can_play(Color.RED):
+                                for k in range(cfg.n_games):
+                                    planned_games.append(
+                                        GameConfig(
+                                            players=GamePlayers(
+                                                yellow_id=a.agent_id, red_id=b.agent_id
+                                            ),
+                                            epsilon_by_agent=eps_map,
+                                            seed=_derive_game_seed(
+                                                cfg.seed,
+                                                a.agent_id,
+                                                b.agent_id,
+                                                Color.YELLOW,
+                                                Color.RED,
+                                                eps_a,
+                                                eps_b,
+                                                k,
+                                            ),
+                                        )
+                                    )
+                            else:
+                                skipped.append(
+                                    SkippedPairing(
+                                        agent_a=a.agent_id,
+                                        agent_b=b.agent_id,
+                                        detail=(
+                                            f"Cannot assign {a.agent_id}=YELLOW and {b.agent_id}=RED under constraints."
                                         ),
                                     )
                                 )
-                        else:
-                            skipped.append(
-                                SkippedPairing(
-                                    agent_a=a.agent_id,
-                                    agent_b=b.agent_id,
-                                    detail=(
-                                        f"Cannot assign {b.agent_id}=YELLOW and {a.agent_id}=RED under constraints."
-                                    ),
+
+                            # assignment 2: B yellow, A red
+                            if b.can_play(Color.YELLOW) and a.can_play(Color.RED):
+                                for k in range(cfg.n_games):
+                                    planned_games.append(
+                                        GameConfig(
+                                            players=GamePlayers(
+                                                yellow_id=b.agent_id, red_id=a.agent_id
+                                            ),
+                                            epsilon_by_agent=eps_map,
+                                            seed=_derive_game_seed(
+                                                cfg.seed,
+                                                a.agent_id,
+                                                b.agent_id,
+                                                Color.RED,
+                                                Color.YELLOW,
+                                                eps_a,
+                                                eps_b,
+                                                k,
+                                            ),
+                                        )
+                                    )
+                            else:
+                                skipped.append(
+                                    SkippedPairing(
+                                        agent_a=a.agent_id,
+                                        agent_b=b.agent_id,
+                                        detail=(
+                                            f"Cannot assign {b.agent_id}=YELLOW and {a.agent_id}=RED under constraints."
+                                        ),
+                                    )
                                 )
-                            )
 
         # Map agent_id -> agent instance
         agent_by_id: dict[str, Connect4Agent] = {
-            s.agent_id: s.agent for s in agent_specs
+            aid: s.agent for aid, s in spec_by_id.items()
         }
 
         # Optional progress bar
@@ -792,6 +853,7 @@ def _aggregate_games(games: list[GameRecord]) -> list[AggregateRow]:
         )
     )
     return out
+
 
 def format_aggregate_table(result: Any) -> str:
     """Builds a nicely formatted table for `result.aggregates` and adds a final score:

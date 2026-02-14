@@ -98,8 +98,7 @@ NTUPLE_STD_LIST: list[list[int]] = [
 def std_to_bitidx(
     tuples: list[list[int]], *, col_height: int = 6, stride: int = 9
 ) -> list[list[int]]:
-    """Convert standard 42-index tuples (col*6+row) to bitboard indices (col*9+row).
-    """
+    """Convert standard 42-index tuples (col*6+row) to bitboard indices (col*9+row)."""
     out: list[list[int]] = []
     for tup in tuples:
         out.append([x + (stride - col_height) * (x // col_height) for x in tup])

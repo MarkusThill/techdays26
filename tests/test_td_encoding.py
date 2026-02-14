@@ -129,8 +129,7 @@ def test_table_positions_matches_td_lut_indices_for_standard_ntuple_set(
 def _bitidx_patterns_to_flatidx(
     patterns_bitidx: np.ndarray, *, off: int = 9
 ) -> np.ndarray:
-    """Convert [M,N] bit indices (col*9+row) to [M,N] flat indices (col*6+row).
-    """
+    """Convert [M,N] bit indices (col*9+row) to [M,N] flat indices (col*6+row)."""
     if patterns_bitidx.ndim != 2:
         raise ValueError("patterns_bitidx must be 2D [M,N].")
     col = patterns_bitidx // off
