@@ -186,6 +186,7 @@ class AggregateRow:
     timeouts: int
     illegal_moves: int
     exceptions: int
+    total_time_s: float
 
 
 def _to_jsonable(obj: Any) -> Any:
@@ -309,6 +310,7 @@ class ArenaResult:
                 timeouts=int(x["timeouts"]),
                 illegal_moves=int(x["illegal_moves"]),
                 exceptions=int(x["exceptions"]),
+                total_time_s=float(x.get("total_time_s", 0.0)),
             )
 
         return cls(
@@ -787,7 +789,7 @@ def _derive_game_seed(
 def _aggregate_games(games: list[GameRecord]) -> list[AggregateRow]:
     """Aggregate per (agent_yellow, agent_red, eps_y, eps_r)."""
     # Key: (yellow_id, red_id, eps_y, eps_r)
-    agg: dict[tuple[str, str, float, float], dict[str, int]] = {}
+    agg: dict[tuple[str, str, float, float], dict[str, float]] = {}
 
     for g in games:
         y_id = g.game_cfg.players.yellow_id
@@ -806,10 +808,12 @@ def _aggregate_games(games: list[GameRecord]) -> list[AggregateRow]:
                 timeouts=0,
                 illegal_moves=0,
                 exceptions=0,
+                total_time_s=0.0,
             )
 
         a = agg[key]
         a["games"] += 1
+        a["total_time_s"] += sum(mm.elapsed_s for mm in g.move_meta)
 
         if g.termination == TerminationReason.DRAW:
             a["draws"] += 1
@@ -833,13 +837,14 @@ def _aggregate_games(games: list[GameRecord]) -> list[AggregateRow]:
                 agent_red=r_id,
                 epsilon_yellow=eps_y,
                 epsilon_red=eps_r,
-                games=d["games"],
-                yellow_wins=d["yellow_wins"],
-                red_wins=d["red_wins"],
-                draws=d["draws"],
-                timeouts=d["timeouts"],
-                illegal_moves=d["illegal_moves"],
-                exceptions=d["exceptions"],
+                games=int(d["games"]),
+                yellow_wins=int(d["yellow_wins"]),
+                red_wins=int(d["red_wins"]),
+                draws=int(d["draws"]),
+                timeouts=int(d["timeouts"]),
+                illegal_moves=int(d["illegal_moves"]),
+                exceptions=int(d["exceptions"]),
+                total_time_s=d["total_time_s"],
             )
         )
 
@@ -882,6 +887,7 @@ def format_aggregate_table(result: Any) -> str:
             "timeouts": int(getattr(r, "timeouts", 0)),
             "illegal": int(getattr(r, "illegal_moves", 0)),
             "exc": int(getattr(r, "exceptions", 0)),
+            "time": float(getattr(r, "total_time_s", 0.0)),
         })
 
     # Column order + formatting
@@ -899,6 +905,7 @@ def format_aggregate_table(result: Any) -> str:
         ("timeouts", "TO", "{:d}"),
         ("illegal", "Ill", "{:d}"),
         ("exc", "Exc", "{:d}"),
+        ("time", "Time", "{:.1f}s"),
     ]
 
     # Pre-render cells to compute widths
@@ -942,6 +949,7 @@ def get_table_legend():
         "TO     = Games lost due to timeout\n"
         "Ill    = Games lost due to illegal moves\n"
         "Exc    = Games lost due to exceptions\n"
+        "Time   = Total wall-clock time (seconds) spent on all moves in this group\n"
     )
     return legend
 

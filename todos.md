@@ -1,7 +1,5 @@
 # Connect-4 Example
 ---
-- Allow fix match combinations for GameArena (or skip certain combinations)
-- Log away ||ΔW|| / ||W||
 - Refactorings: Notebooks -> codebase
 - Unit Tests for refactored classes necessary.
 - Docstrings + ruff + mypy/pyrefly/ty linting
