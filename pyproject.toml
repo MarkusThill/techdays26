@@ -1,7 +1,7 @@
 # https://packaging.python.org/en/latest/tutorials/packaging-projects/#creating-pyproject-toml
 [project]
 name = "techdays26"
-version = "0.0.0"
+version = "0.0.1"
 description = "Accompanying Repository for the Tech Days 2026"
 authors = [
     { name = "Markus Thill" }
@@ -77,7 +77,7 @@ namespaces = false  # to disable scanning PEP 420 namespaces (true by default)
 
 [tool.commitizen]
 name = "cz_conventional_commits"
-version = "0.0.0"
+version = "0.0.1"
 version_files = [
     "src/techdays26/__init__.py:__version__",
     "pyproject.toml:^version",
