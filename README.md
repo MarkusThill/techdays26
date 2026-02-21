@@ -72,6 +72,9 @@ cz bump --dry-run
 
 # Actually bump (updates pyproject.toml, __init__.py, creates tag, updates CHANGELOG.md):
 cz bump
+
+# Push the commit and tag to remote:
+git push && git push --tags
 ```
 
 The version is tracked in:
