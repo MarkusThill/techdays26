@@ -40,6 +40,7 @@ dev = [
     "pre-commit",
     "ipywidgets",
     "ruff", # For linting
+    "nbstripout", # Strip notebook outputs before committing
     "mkdocs",
     "mkdocs-material",
     "pytest"
@@ -73,6 +74,16 @@ exclude = ["techdays26.tests*"]  # exclude packages matching these glob patterns
 namespaces = false  # to disable scanning PEP 420 namespaces (true by default)
 
 
+
+[tool.commitizen]
+name = "cz_conventional_commits"
+version = "0.0.0"
+version_files = [
+    "src/techdays26/__init__.py:__version__",
+    "pyproject.toml:^version",
+]
+tag_format = "v$version"
+update_changelog_on_bump = true
 
 [tool.ruff]
 extend-include = ["*.ipynb"]
