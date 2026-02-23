@@ -11,6 +11,7 @@ from techdays26.ntuples import (
     _bitidx_valid_cells,
     format_ntuple,
     generate_random_ntuples,
+    merge_ntuples,
     ntuple_summary,
     std_to_bitidx,
 )
@@ -286,3 +287,53 @@ class TestFormatNtuple:
         # Other lines should be all _
         for line in lines[:-1]:
             assert "X" not in line
+
+
+# ---------------------------------------------------------------------------
+# merge_ntuples
+# ---------------------------------------------------------------------------
+class TestMergeNtuples:
+    def test_no_overlap(self):
+        a = [[0, 1, 2], [3, 4, 5]]
+        b = [[6, 7, 8], [9, 10, 11]]
+        assert merge_ntuples(a, b) == [[0, 1, 2], [3, 4, 5], [6, 7, 8], [9, 10, 11]]
+
+    def test_exact_duplicates_removed(self):
+        a = [[0, 1, 2], [3, 4, 5]]
+        b = [[3, 4, 5], [6, 7, 8]]
+        result = merge_ntuples(a, b)
+        assert result == [[0, 1, 2], [3, 4, 5], [6, 7, 8]]
+
+    def test_unsorted_duplicate_detected(self):
+        """Even if a duplicate is unsorted, it should be detected."""
+        a = [[0, 1, 2]]
+        b = [[2, 0, 1]]
+        result = merge_ntuples(a, b)
+        assert len(result) == 1
+
+    def test_preserves_first_occurrence(self):
+        a = [[0, 1, 2]]
+        b = [[2, 0, 1]]
+        result = merge_ntuples(a, b)
+        assert result[0] == [0, 1, 2]  # keeps a's version
+
+    def test_empty_inputs(self):
+        assert merge_ntuples([], []) == []
+        assert merge_ntuples([[0, 1]], []) == [[0, 1]]
+        assert merge_ntuples([], [[0, 1]]) == [[0, 1]]
+
+    def test_single_input(self):
+        a = [[0, 1], [2, 3], [0, 1]]
+        result = merge_ntuples(a)
+        assert result == [[0, 1], [2, 3]]
+
+    def test_three_inputs(self):
+        a = [[0, 1]]
+        b = [[2, 3]]
+        c = [[0, 1], [4, 5]]
+        result = merge_ntuples(a, b, c)
+        assert result == [[0, 1], [2, 3], [4, 5]]
+
+    def test_with_real_tuples(self):
+        merged = merge_ntuples(NTUPLE_BITIDX_LIST, NTUPLE_BITIDX_LIST)
+        assert len(merged) == len(NTUPLE_BITIDX_LIST)

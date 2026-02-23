@@ -257,3 +257,26 @@ def ntuple_summary(tuples: list[list[int]]) -> dict[str, object]:
         info["lut_size"] = 4 ** lengths[0]
 
     return info
+
+
+def merge_ntuples(*tuple_sets: list[list[int]]) -> list[list[int]]:
+    """Merge multiple n-tuple lists, removing duplicates.
+
+    Duplicates are detected by comparing sorted cell lists.  The first
+    occurrence (in iteration order across all inputs) is kept.
+
+    Args:
+        *tuple_sets: One or more lists of n-tuples to merge.
+
+    Returns:
+        A single deduplicated list of n-tuples preserving first-seen order.
+    """
+    seen: set[tuple[int, ...]] = set()
+    merged: list[list[int]] = []
+    for ts in tuple_sets:
+        for tup in ts:
+            key = tuple(sorted(tup))
+            if key not in seen:
+                seen.add(key)
+                merged.append(tup)
+    return merged
