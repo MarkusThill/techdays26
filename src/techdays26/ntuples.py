@@ -106,3 +106,35 @@ def std_to_bitidx(
 
 
 NTUPLE_BITIDX_LIST = std_to_bitidx(NTUPLE_STD_LIST)
+
+
+def ntuple_summary(tuples: list[list[int]]) -> dict[str, object]:
+    """Return a metadata dict describing an n-tuple set.
+
+    Keys:
+        count       - number of tuples (M)
+        length      - tuple length (N) if uniform, else list of lengths
+        uniform     - True if all tuples have the same length
+        lut_size    - 4^N (only present when uniform)
+        hash        - deterministic hex digest of the tuple set (SHA-256)
+    """
+    import hashlib
+    import json
+
+    lengths = [len(t) for t in tuples]
+    uniform = len(set(lengths)) == 1
+
+    # Deterministic hash: canonical JSON of sorted tuples
+    canonical = json.dumps(sorted(tuple(t) for t in tuples), separators=(",", ":"))
+    digest = hashlib.sha256(canonical.encode()).hexdigest()
+
+    info: dict[str, object] = {
+        "count": len(tuples),
+        "length": lengths[0] if uniform else lengths,
+        "uniform": uniform,
+        "hash": digest,
+    }
+    if uniform:
+        info["lut_size"] = 4 ** lengths[0]
+
+    return info
