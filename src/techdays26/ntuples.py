@@ -108,6 +108,125 @@ def std_to_bitidx(
 NTUPLE_BITIDX_LIST = std_to_bitidx(NTUPLE_STD_LIST)
 
 
+def _bitidx_valid_cells(
+    *, n_cols: int = 7, n_rows: int = 6, stride: int = 9
+) -> list[int]:
+    """Return sorted list of all valid bitboard cell indices."""
+    return [col * stride + row for col in range(n_cols) for row in range(n_rows)]
+
+
+def _bitidx_neighbors(
+    cell: int, *, n_cols: int = 7, n_rows: int = 6, stride: int = 9
+) -> list[int]:
+    """Return 8-connected neighbors of *cell* in bitboard layout."""
+    col, row = divmod(cell, stride)
+    neighbors = []
+    for dc in (-1, 0, 1):
+        for dr in (-1, 0, 1):
+            if dc == 0 and dr == 0:
+                continue
+            nc, nr = col + dc, row + dr
+            if 0 <= nc < n_cols and 0 <= nr < n_rows:
+                neighbors.append(nc * stride + nr)
+    return neighbors
+
+
+def generate_random_ntuples(
+    m: int,
+    n: int,
+    *,
+    seed: int | None = None,
+    max_retries: int = 1000,
+) -> list[list[int]]:
+    """Generate *m* n-tuples of length *n* via random walks on the bitboard grid.
+
+    Each walk starts at a uniformly random cell, then repeatedly steps to a
+    random **unvisited** 8-connected neighbor.  If the walk gets stuck before
+    reaching length *n*, it is discarded and restarted (up to *max_retries*
+    per tuple).
+
+    Args:
+        m: Number of tuples to generate.
+        n: Desired length of each tuple (number of cells).
+        seed: Optional RNG seed for reproducibility.
+        max_retries: Maximum restart attempts per tuple before raising.
+
+    Returns:
+        List of *m* tuples, each a sorted list of *n* bitboard cell indices.
+
+    Raises:
+        RuntimeError: If a tuple cannot be completed within *max_retries*.
+    """
+    import random
+
+    rng = random.Random(seed)
+    cells = _bitidx_valid_cells()
+
+    # Pre-compute neighbor lookup
+    adj: dict[int, list[int]] = {c: _bitidx_neighbors(c) for c in cells}
+
+    tuples: list[list[int]] = []
+    for i in range(m):
+        for attempt in range(max_retries):
+            visited: set[int] = set()
+            start = rng.choice(cells)
+            path = [start]
+            visited.add(start)
+            for _ in range(n - 1):
+                candidates = [nb for nb in adj[path[-1]] if nb not in visited]
+                if not candidates:
+                    break  # stuck — restart
+                nxt = rng.choice(candidates)
+                path.append(nxt)
+                visited.add(nxt)
+            if len(path) == n:
+                tuples.append(sorted(path))
+                break
+        else:
+            raise RuntimeError(
+                f"Failed to generate tuple {i} of length {n} "
+                f"after {max_retries} retries"
+            )
+
+    return tuples
+
+
+def format_ntuple(
+    ntuple: list[int],
+    *,
+    n_cols: int = 7,
+    n_rows: int = 6,
+    stride: int = 9,
+    cell_char: str = "X",
+    empty_char: str = "_",
+) -> str:
+    """Return a human-readable board string showing the cells of one n-tuple.
+
+    Example output (for an n-tuple containing cells 9, 27, 36, 45)::
+
+        _  _  _  _  _  _  _
+        _  _  _  _  _  _  _
+        _  _  _  _  _  _  _
+        _  _  _  _  _  _  _
+        _  _  _  _  _  _  _
+        _  X  _  X  X  X  _
+    """
+    cells = set(ntuple)
+    lines: list[str] = []
+    for row in range(n_rows - 1, -1, -1):  # top row first
+        cols = []
+        for col in range(n_cols):
+            idx = col * stride + row
+            cols.append(cell_char if idx in cells else empty_char)
+        lines.append("  ".join(cols))
+    return "\n".join(lines)
+
+
+def print_ntuple(ntuple: list[int], **kwargs: object) -> None:
+    """Print a single n-tuple on the board grid. See :func:`format_ntuple`."""
+    print(format_ntuple(ntuple, **kwargs))  # type: ignore[arg-type]
+
+
 def ntuple_summary(tuples: list[list[int]]) -> dict[str, object]:
     """Return a metadata dict describing an n-tuple set.
 
