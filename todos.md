@@ -1,6 +1,7 @@
 # Connect-4 Example
 ---
 - Refactorings: Notebooks -> codebase
+- Try CNNs?
 - Unit Tests for refactored classes necessary.
 - Docstrings + ruff + mypy/pyrefly/ty linting
 - Investigate efficient way to implement eligibility traces (see Sutton & Barto)
