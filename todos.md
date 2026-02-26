@@ -1,5 +1,6 @@
 # Connect-4 Example
 ---
+- Plot scores vs. elapsed wall-clock time
 - Refactorings: Notebooks -> codebase
 - Try CNNs?
 - Unit Tests for refactored classes necessary.
