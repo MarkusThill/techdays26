@@ -80,7 +80,7 @@ class BoardBatch:
             patterns_bitidx = patterns_bitidx.to(device=dev)
 
         dkey = cls._dev_key(dev)
-        key = (dkey[0], dkey[1], id(patterns_bitidx))
+        key = (dkey[0], dkey[1], id(patterns_bitidx), *patterns_bitidx.shape)
 
         masks = cls._PATTERN_MASKS_CACHE.get(key)
         if masks is None:
