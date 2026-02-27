@@ -5,8 +5,6 @@ import torch.nn as nn
 
 
 class NTupleNetwork(nn.Module):
-    _STRIDE: int = 9  # matches BoardBatch.COLUMN_BIT_OFFSET
-
     def __init__(self, n_tuple_list: list[list[int]]):
         super().__init__()
 
@@ -19,39 +17,23 @@ class NTupleNetwork(nn.Module):
             "n_tuple_tensor", torch.tensor(n_tuple_list, dtype=torch.int64)
         )
 
-        # Precompute mirrored pattern bit indices (mirror column c → 6-c, keep row)
-        # so we can evaluate original + mirror symmetry in a single table_positions call.
-        s = self._STRIDE
-        mir_list = [
-            [(6 - idx // s) * s + (idx % s) for idx in tup] for tup in n_tuple_list
-        ]
-        combined = torch.cat(
-            [
-                torch.tensor(n_tuple_list, dtype=torch.int64),
-                torch.tensor(mir_list, dtype=torch.int64),
-            ],
-            dim=0,
-        )  # [2M, N]
-        self.register_buffer("n_tuple_combined", combined, persistent=False)
-
         # Two players × M LUTs × K entries
         # 0 = Yellow, 1 = Red
         self.W = nn.Parameter(torch.zeros(2, self.M, self.K))
 
     def forward(self, board: "BoardBatch") -> torch.Tensor:
         """Returns [B] tensor in [-1, 1]."""
-        # Single table_positions call for original + mirrored patterns
-        T_all = board.table_positions(self.n_tuple_combined)  # [B, 2M]
-        T = T_all[:, : self.M]  # [B, M] original
-        T_mir = T_all[:, self.M :]  # [B, M] mirrored
-        B = T.shape[0]
+        # [B, M] table indices
+        T = board.table_positions(self.n_tuple_tensor)
+        T_mir = board.mirror().table_positions(self.n_tuple_tensor)
+        B, M = T.shape
         dev = T.device
 
         # Active player per board: 0=Yellow, 1=Red
         player_idx = ((board.moves_left.to(torch.int64) & 1) != 0).to(torch.int64)
 
         # Pattern indices [M]
-        m_idx = torch.arange(self.M, device=dev)
+        m_idx = torch.arange(M, device=dev)
 
         # Gather: W[player_idx[b], m, T[b,m]]
         w = self.W[
