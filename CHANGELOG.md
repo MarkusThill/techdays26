@@ -1,3 +1,21 @@
+## v0.0.4 (2026-02-28)
+
+### Fix
+
+- allow to repeat an experiment n times
+- add torch.compile to target and online network
+- avoid mirroring board, mirror n-tuples once instead
+- put all afterstates through net at once
+- fixed some plotting errors
+
+### Refactor
+
+- refactored plotting code
+
+### Perf
+
+- adapted the currently best-working params
+
 ## v0.0.3 (2026-02-25)
 
 ### Fix
