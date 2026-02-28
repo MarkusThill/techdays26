@@ -1,6 +1,8 @@
 # Connect-4 Example
 ---
-- AUC for curves
+- Allow to repeat experiment n times!
+- alow to evaluate a model without saving it first to hard-drive.
+- keep track of the currently best model (weighted scores?).
 - Connect-4 Basics:
   - Number of positions
 - Interactive Bitboard Illustration
@@ -24,6 +26,9 @@
 
 # C4 Facts
 - 4,531,985,219,092 states
+- weakly solved by Allis (1988)
+- first strong solution took 40,000 h (4.5 years)
 - Checking one position per millisecond (1000 pos / s) would still take ~143 years.
 - Even at a million positions per second, brute force takes ~52 days.
 - There are over 500 Connect-4 positions for every human on Earth.
+
