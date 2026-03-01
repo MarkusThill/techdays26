@@ -1,3 +1,9 @@
+## v0.0.5 (2026-03-01)
+
+### Fix
+
+- torch._dynamo hit config.recompile_limit
+
 ## v0.0.4 (2026-02-28)
 
 ### Fix
