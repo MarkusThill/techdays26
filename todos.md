@@ -1,10 +1,7 @@
 # Connect-4 Example
 ---
-- Allow to repeat experiment n times!
 - alow to evaluate a model without saving it first to hard-drive.
 - keep track of the currently best model (weighted scores?).
-- Connect-4 Basics:
-  - Number of positions
 - Interactive Bitboard Illustration
   - Then: N-Tuple systems. Sparsity: Compute how many realizations are possible per LUT for a given n-tuple
 - Combine TD agent with shallow tree search
