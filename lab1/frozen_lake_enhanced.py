@@ -224,7 +224,9 @@ class FrozenLakeEnv(Env):
         self,
         render_mode: Optional[str] = None,
         desc=None,
+        *,
         map_name="4x4",
+        show_q_labels=False,
         is_slippery=True,
         success_rate: float = 1.0 / 3.0,
         reward_schedule: tuple[int, int, int] = (1, 0, 0),
@@ -314,7 +316,7 @@ class FrozenLakeEnv(Env):
         self.episode = "---"
         self.info_dict = {}
         self.next_action = None
-        self.show_q_labels = True
+        self.show_q_labels = show_q_labels
         self.pygame_initialized = (
             False  # flag to determine if pygame has been initialized
         )

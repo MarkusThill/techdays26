@@ -49,6 +49,7 @@ dev = [
 lab1 = [
     "bitbully[gui]>=0.0.75",
     "numpy",
+    "gymnasium[toy_text]",
 ]
 
 lab2 = [

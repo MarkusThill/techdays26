@@ -1,5 +1,6 @@
 # Manual play mode for Frozen Lake with Q-learning.
 # The user selects actions via arrow keys, but Q-values are still learned and displayed.
+# https://github.com/johnnycode8/gym_solutions
 
 import gymnasium as gym
 import numpy as np
@@ -20,7 +21,8 @@ def play(episodes=1000):
         "FrozenLake-enhanced",
         desc=None,
         map_name="8x8",
-        is_slippery=True,
+        show_q_labels = True,
+        is_slippery=False,
         success_rate=3 / 4,
         reward_schedule=(1, -1, 0),
         render_mode="human",
