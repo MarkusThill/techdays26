@@ -1,4 +1,5 @@
-import pygame 
+import pygame
+
 
 def get_action_from_keyboard(key_to_action):
     """
@@ -14,11 +15,19 @@ def get_action_from_keyboard(key_to_action):
                     return None
                 if event.key in key_to_action:
                     return key_to_action[event.key]
-        pygame.time.wait(30)
+        pygame.time.wait(10)
+
 
 key_to_action = {
-        pygame.K_LEFT: 0,
-        pygame.K_DOWN: 1,
-        pygame.K_RIGHT: 2,
-        pygame.K_UP: 3,
-    }
+    pygame.K_LEFT: 0,
+    pygame.K_DOWN: 1,
+    pygame.K_RIGHT: 2,
+    pygame.K_UP: 3,
+}
+
+action_to_arrow = {
+    0: "←",
+    1: "↓",
+    2: "→",
+    3: "↑",
+}

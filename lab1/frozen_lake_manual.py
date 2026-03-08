@@ -21,7 +21,7 @@ def play(episodes=1000):
         "FrozenLake-enhanced",
         desc=None,
         map_name="8x8",
-        show_q_labels = True,
+        show_q_labels=True,
         is_slippery=False,
         success_rate=3 / 4,
         reward_schedule=(1, -1, 0),
