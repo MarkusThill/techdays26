@@ -231,6 +231,8 @@ class FrozenLakeEnv(Env):
         success_rate: float = 1.0 / 3.0,
         reward_schedule: tuple[int, int, int] = (1, 0, 0),
     ):
+        self.metadata["render_fps"] = 4
+
         if desc is None and map_name is None:
             desc = generate_random_map()
         elif desc is None:
@@ -313,6 +315,7 @@ class FrozenLakeEnv(Env):
 
         # Additional variables
         self.q_table = None
+        self.v_table = None
         self.episode = "---"
         self.info_dict = {}
         self.next_action = None
@@ -426,6 +429,8 @@ class FrozenLakeEnv(Env):
             self.ui_font_bold = pygame.font.SysFont("Courier", 25, True)
             self.q_font = pygame.font.SysFont("Courier", 20)
             self.q_font_bold = pygame.font.SysFont("Courier", 20, True)
+            self.v_font = pygame.font.SysFont("Courier", 22)  # <<< NEW
+            self.v_font_bold = pygame.font.SysFont("Courier", 22, True)  # <<< NEW
 
             if mode == "human":
                 pygame.display.init()
@@ -586,6 +591,37 @@ class FrozenLakeEnv(Env):
 
                         self.window_surface.blit(q_img, q_pos)
 
+                if (
+                    self.show_q_labels
+                    and self.v_table is not None
+                    and desc[y][x] not in (b"H", b"G")
+                ):
+                    state = self.nrow * y + x
+                    v = float(self.v_table[state])
+
+                    # Format for display
+                    v_str = "{:.2f}".format(v).lstrip("0")
+
+                    # Color: -1 = bright red, 0 = black, +1 = bright blue
+                    val = max(-1.0, min(1.0, v))
+                    if val < 0:  # black to red
+                        t = -val
+                        color = (int(255 * t), 0, 0)
+                    else:  # black to blue
+                        t = val
+                        color = (0, 0, int(255 * t))
+
+                    # Bold if |v| is the max in its row (optional heuristic)
+                    # You can simplify and always use v_font_bold if you prefer.
+                    v_img = self.v_font_bold.render(v_str, True, color)
+
+                    w, h = v_img.get_width(), v_img.get_height()
+                    v_pos = (
+                        pos[0] + self.cell_size[0] / 2 - w / 2,
+                        pos[1] + self.cell_size[1] / 2 - h / 2,
+                    )
+                    self.window_surface.blit(v_img, v_pos)
+
         # paint the elf
         bot_row, bot_col = self.s // self.ncol, self.s % self.ncol
         cell_rect = (bot_col * self.cell_size[0], bot_row * self.cell_size[1])
@@ -730,6 +766,15 @@ class FrozenLakeEnv(Env):
     # pass in q
     def set_q(self, q_table):
         self.q_table = q_table
+
+    def set_v(self, v_table):
+        """
+        Set the state-value function V(s).
+
+        v_table should be a 1D array-like of length nS (nrow * ncol),
+        where index s = row * ncol + col.
+        """
+        self.v_table = v_table
 
     def set_episode(self, episode):
         self.episode = episode
