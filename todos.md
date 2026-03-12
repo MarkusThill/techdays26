@@ -6,6 +6,7 @@
 
 # Connect-4 Example
 ---
+- Let RL agent play against ChatGPT
 - look for "afterstates" in suttons book!
 - compare to https://www.kaggle.com/code/auxeno/alphazero-connect-4-rl
 - allow to evaluate a model without saving it first to hard-drive.
