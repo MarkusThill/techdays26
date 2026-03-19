@@ -79,11 +79,21 @@ for c in range(N_COLS):
 
 # Direction shifts for win detection (matching Board.cpp hasWin)
 WIN_DIRECTIONS = {
-    "Vertical (↕)": 1,
-    "Horizontal (↔)": COL_BIT_OFFSET,
-    "Diagonal (⟋)": COL_BIT_OFFSET - 1,
-    "Diagonal (⟍)": COL_BIT_OFFSET + 1,
+    "Vert": 1,
+    "Horiz": COL_BIT_OFFSET,
+    "Diag /": COL_BIT_OFFSET - 1,
+    "Diag \\": COL_BIT_OFFSET + 1,
 }
+
+# Win detection steps — parameterized by d (direction shift)
+WIN_STEPS = [
+    "y (last player)",
+    "y << d",
+    "y << 2d",
+    "y & (y << 2d)  [=pairs]",
+    "pairs << d",
+    "pairs & (pairs << d)  [=win?]",
+]
 
 # Colors
 C_EMPTY = "#2c3e50"
@@ -140,12 +150,25 @@ def _format_bin_grouped(val: int) -> str:
 class BitboardVisualizer:
     """Interactive bitboard visualization widget for Jupyter notebooks."""
 
+    OVERLAY_OPTIONS = [
+        "allTokens",
+        "activePTokens",
+        "Opponent Tokens (active XOR all)",
+        "Legal Moves",
+        "Winning Positions (current player)",
+        "Bit Index Map",
+    ] + WIN_STEPS
+
     def __init__(self, init_moves: str = "") -> None:
         self._board = Board(init_moves) if init_moves else Board()
         self._move_history: str = init_moves
 
-        # ── UI state ──
-        self._selected_overlay = "None"
+        # ── UI state: 3 overlay selections ──
+        self._selected_overlays = [
+            "allTokens",
+            "activePTokens",
+            "Opponent Tokens (active XOR all)",
+        ]
 
         # ── Build widgets ──
         self._build_widgets()
@@ -156,12 +179,24 @@ class BitboardVisualizer:
     # ──────────────────────────────────────────────────────────────
     def _build_widgets(self) -> None:
         # Main board output (matplotlib)
-        self._out_board = Output(layout=Layout(width="420px", height="410px"))
+        self._out_board = Output(layout=Layout(width="auto"))
 
-        # Bitboard grid outputs
-        self._out_bb_all = Output(layout=Layout(width="420px", height="410px"))
-        self._out_bb_active = Output(layout=Layout(width="420px", height="410px"))
-        self._out_overlay = Output(layout=Layout(width="420px", height="410px"))
+        # 3 overlay panel outputs + dropdowns
+        self._out_panels: list[Output] = []
+        self._dd_panels: list[Dropdown] = []
+        for i in range(3):
+            out = Output(layout=Layout(width="auto"))
+            dd = Dropdown(
+                options=self.OVERLAY_OPTIONS,
+                value=self._selected_overlays[i],
+                layout=Layout(width="100%"),
+            )
+            dd.observe(
+                lambda change, idx=i: self._on_overlay_change(change, idx),
+                names="value",
+            )
+            self._out_panels.append(out)
+            self._dd_panels.append(dd)
 
         # Info panel
         self._html_info = HTML(layout=Layout(width="100%", padding="8px"))
@@ -201,23 +236,14 @@ class BitboardVisualizer:
         )
         self._btn_reset.on_click(self._on_reset)
 
-        # Overlay selector
-        self._dd_overlay = Dropdown(
-            options=[
-                "None",
-                "Legal Moves",
-                "Winning Positions (current player)",
-                "Win Check: Vertical (↕)",
-                "Win Check: Horizontal (↔)",
-                "Win Check: Diagonal (⟋)",
-                "Win Check: Diagonal (⟍)",
-                "Bit Index Map",
-            ],
-            value="None",
-            description="Overlay:",
-            layout=Layout(width="380px"),
+        # Direction selector for win-detection steps (shared across all panels)
+        self._dd_direction = Dropdown(
+            options=list(WIN_DIRECTIONS.keys()),
+            value="Vert",
+            description="d =",
+            layout=Layout(width="200px"),
         )
-        self._dd_overlay.observe(self._on_overlay_change, names="value")
+        self._dd_direction.observe(lambda _: self._refresh_all(), names="value")
 
         # ── Explanation panel ──
         self._html_explain = HTML(layout=Layout(width="100%", padding="8px"))
@@ -225,28 +251,20 @@ class BitboardVisualizer:
     def show(self) -> None:
         """Display the widget in the notebook."""
         top_controls = HBox(
-            [self._txt_moves, self._btn_undo, self._btn_reset],
+            [self._txt_moves, self._btn_undo, self._btn_reset, self._dd_direction],
             layout=Layout(align_items="center", gap="8px"),
         )
 
         board_label = HTML("<b>Board State</b>")
-        all_label = HTML("<b>allTokens</b> (all pieces)")
-        active_label = HTML("<b>activePTokens</b> (current player)")
-        overlay_label = HTML("<b>Overlay / Derived</b>")
+
+        # Build 3 overlay columns, each with dropdown + output
+        overlay_cols = []
+        for i in range(3):
+            overlay_cols.append(VBox([self._dd_panels[i], self._out_panels[i]]))
 
         grids = HBox(
-            [
-                VBox([board_label, self._out_board]),
-                VBox([all_label, self._out_bb_all]),
-                VBox([active_label, self._out_bb_active]),
-                VBox([overlay_label, self._out_overlay]),
-            ],
+            [VBox([board_label, self._out_board])] + overlay_cols,
             layout=Layout(gap="4px"),
-        )
-
-        overlay_row = HBox(
-            [self._dd_overlay],
-            layout=Layout(align_items="center", gap="8px"),
         )
 
         layout = VBox(
@@ -255,7 +273,6 @@ class BitboardVisualizer:
                 top_controls,
                 self._hbox_cols,
                 grids,
-                overlay_row,
                 self._html_info,
                 self._html_binary,
                 self._html_explain,
@@ -299,8 +316,8 @@ class BitboardVisualizer:
         except Exception:
             pass  # invalid sequence, ignore
 
-    def _on_overlay_change(self, change) -> None:
-        self._selected_overlay = change["new"]
+    def _on_overlay_change(self, change, idx: int) -> None:
+        self._selected_overlays[idx] = change["new"]
         self._refresh_all()
 
     # ──────────────────────────────────────────────────────────────
@@ -313,11 +330,8 @@ class BitboardVisualizer:
         moves_left = raw[2]
 
         self._draw_board()
-        self._draw_bitboard_grid(self._out_bb_all, all_tokens, "allTokens", C_BIT_ON)
-        self._draw_bitboard_grid(
-            self._out_bb_active, active_tokens, "activePTokens", C_HIGHLIGHT
-        )
-        self._draw_overlay(all_tokens, active_tokens)
+        for i in range(3):
+            self._draw_overlay_panel(i, all_tokens, active_tokens)
         self._update_info(all_tokens, active_tokens, moves_left)
         self._update_binary(all_tokens, active_tokens)
         self._update_explanation()
@@ -477,69 +491,98 @@ class BitboardVisualizer:
             display(fig)
             plt.close(fig)
 
-    def _draw_overlay(self, all_tokens: int, active_tokens: int) -> None:
-        """Draw the selected overlay visualization."""
-        overlay = self._selected_overlay
+    def _draw_overlay_panel(
+        self, panel_idx: int, all_tokens: int, active_tokens: int
+    ) -> None:
+        """Draw the selected overlay for a given panel."""
+        out = self._out_panels[panel_idx]
+        overlay = self._selected_overlays[panel_idx]
 
-        if overlay == "None":
-            # Show opponent's tokens (XOR trick)
+        if overlay == "allTokens":
+            self._draw_bitboard_grid(out, all_tokens, "allTokens", C_BIT_ON)
+            return
+
+        if overlay == "activePTokens":
+            self._draw_bitboard_grid(out, active_tokens, "activePTokens", C_HIGHLIGHT)
+            return
+
+        if overlay == "Opponent Tokens (active XOR all)":
             opponent = active_tokens ^ all_tokens
-            self._draw_bitboard_grid(
-                self._out_overlay,
-                opponent,
-                "Opponent Tokens",
-                "#e67e22",
-                show_sentinels=True,
-            )
+            self._draw_bitboard_grid(out, opponent, "Opponent Tokens", "#e67e22")
             return
 
         if overlay == "Legal Moves":
             legal = (all_tokens + BB_BOTTOM_ROW) & BB_ALL_LEGAL
             self._draw_bitboard_grid(
-                self._out_overlay,
+                out,
                 0,
                 "Legal Moves",
                 C_BIT_ON,
                 highlight_mask=legal,
                 highlight_color=C_LEGAL,
-                show_sentinels=True,
             )
             return
 
         if overlay == "Winning Positions (current player)":
-            # Use the engine to compute
-            # winningPositions for current player
-            active = active_tokens
-            wp = self._compute_winning_positions(active)
-            # Filter to legal
+            wp = self._compute_winning_positions(active_tokens)
             legal = (all_tokens + BB_BOTTOM_ROW) & BB_ALL_LEGAL
             threats = wp & legal & ~all_tokens
             self._draw_bitboard_grid(
-                self._out_overlay,
+                out,
                 wp & BB_ALL_LEGAL,
                 "Winning Positions",
                 C_BIT_ON,
                 highlight_mask=threats,
                 highlight_color=C_THREAT,
-                show_sentinels=True,
             )
             return
 
         if overlay == "Bit Index Map":
-            self._draw_bit_index_map()
+            self._draw_bit_index_map(out)
             return
 
-        # Win check directions
-        for dir_name, shift in WIN_DIRECTIONS.items():
-            if overlay == f"Win Check: {dir_name}":
-                opponent = active_tokens ^ all_tokens
-                self._draw_win_check(opponent, shift, dir_name)
-                return
+        # Win detection steps — d comes from the shared direction dropdown
+        dir_name = self._dd_direction.value
+        d = WIN_DIRECTIONS[dir_name]
+        y = (active_tokens ^ all_tokens) & BB_ALL_LEGAL
+        pairs = y & (y << (2 * d)) & BB_ALL_LEGAL
 
-    def _draw_bit_index_map(self) -> None:
+        if overlay == "y (last player)":
+            self._draw_bitboard_grid(out, y, f"y  ({dir_name}, d={d})", C_BIT_ON)
+        elif overlay == "y << d":
+            self._draw_bitboard_grid(
+                out, (y << d) & BB_ALL_LEGAL, f"y << {d}  ({dir_name})", C_BIT_ON
+            )
+        elif overlay == "y << 2d":
+            self._draw_bitboard_grid(
+                out,
+                (y << (2 * d)) & BB_ALL_LEGAL,
+                f"y << {2 * d}  ({dir_name})",
+                C_BIT_ON,
+            )
+        elif overlay == "y & (y << 2d)  [=pairs]":
+            self._draw_bitboard_grid(
+                out, pairs, f"y & (y << {2 * d})  ({dir_name})", C_THREAT
+            )
+        elif overlay == "pairs << d":
+            self._draw_bitboard_grid(
+                out,
+                (pairs << d) & BB_ALL_LEGAL,
+                f"pairs << {d}  ({dir_name})",
+                C_THREAT,
+            )
+        elif overlay == "pairs & (pairs << d)  [=win?]":
+            result = pairs & (pairs << d) & BB_ALL_LEGAL
+            color = C_WIN if result else C_BIT_ON
+            label = f"pairs & (pairs << {d})  ({dir_name})"
+            if result:
+                label += "  WIN!"
+            self._draw_bitboard_grid(out, result, label, color)
+
+    def _draw_bit_index_map(self, out: Output) -> None:
         """Draw a grid showing the bit index assigned to each cell."""
-        self._out_overlay.clear_output(wait=True)
-        with self._out_overlay:
+        out.clear_output(wait=True)
+        with out:
             total_rows = N_ROWS + 3
             fig, ax = plt.subplots(1, 1, figsize=(4.0, 3.8))
             fig.patch.set_facecolor("#f8f9fa")
@@ -602,113 +645,6 @@ class BitboardVisualizer:
             fig.tight_layout(pad=0.5)
             display(fig)
             plt.close(fig)
-
-    def _draw_win_check(self, player_bb: int, shift: int, direction: str) -> None:
-        """Illustrate the shift-AND win-detection steps for a given direction."""
-        self._out_overlay.clear_output(wait=True)
-        with self._out_overlay:
-            # Step 1: y & (y << 2*shift)
-            step1 = player_bb & (player_bb << (2 * shift))
-            # Step 2: step1 & (step1 << shift) => non-zero means win
-            step2 = step1 & (step1 << shift)
-            has_win = (step2 & BB_ALL_LEGAL) != 0
-
-            # Show step2 as highlight on player_bb
-            self._out_overlay.clear_output(wait=True)
-            with self._out_overlay:
-                total_rows = N_ROWS + 3
-                fig, ax = plt.subplots(1, 1, figsize=(4.0, 3.8))
-                fig.patch.set_facecolor("#f8f9fa")
-                ax.set_facecolor("#ffffff")
-
-                for c in range(N_COLS):
-                    for r in range(total_rows):
-                        bit = c * COL_BIT_OFFSET + r
-                        is_sentinel = bit in SENTINEL_BITS
-                        dy = r
-
-                        is_player = _bit_set(player_bb, bit)
-                        is_step1 = _bit_set(step1, bit) and not is_sentinel
-                        is_step2 = _bit_set(step2, bit) and not is_sentinel
-
-                        if is_step2:
-                            fc = C_WIN
-                        elif is_step1:
-                            fc = C_THREAT
-                        elif is_player and not is_sentinel:
-                            fc = C_BIT_ON
-                        elif is_sentinel:
-                            fc = C_SENTINEL
-                        else:
-                            fc = C_BIT_OFF
-
-                        rect = mpatches.FancyBboxPatch(
-                            (c + 0.05, dy + 0.05),
-                            0.9,
-                            0.9,
-                            boxstyle="round,pad=0.05",
-                            facecolor=fc,
-                            edgecolor="#bdc3c7",
-                            linewidth=0.5,
-                        )
-                        ax.add_patch(rect)
-
-                        label = "1" if is_player else ("×" if is_sentinel else "0")
-                        txt_c = (
-                            "white"
-                            if (is_player or is_sentinel or is_step1 or is_step2)
-                            else "#2c3e50"
-                        )
-                        ax.text(
-                            c + 0.5,
-                            dy + 0.5,
-                            label,
-                            ha="center",
-                            va="center",
-                            fontsize=8,
-                            fontweight="bold",
-                            color=txt_c,
-                            fontfamily="monospace",
-                        )
-
-                ax.set_xlim(0, N_COLS)
-                ax.set_ylim(0, total_rows)
-                ax.set_xticks(np.arange(N_COLS) + 0.5)
-                ax.set_xticklabels([f"C{i}" for i in range(N_COLS)], fontsize=8)
-                ax.set_yticks(np.arange(total_rows) + 0.5)
-                row_labels = [f"R{r}" for r in range(N_ROWS)] + ["S0", "S1", "S2"]
-                ax.set_yticklabels(row_labels, fontsize=7)
-                ax.tick_params(length=0)
-                ax.set_aspect("equal")
-
-                # Legend
-                legend_elements = [
-                    mpatches.Patch(facecolor=C_BIT_ON, label="Player bits"),
-                    mpatches.Patch(facecolor=C_THREAT, label="y & (y≪2d) [pairs]"),
-                    mpatches.Patch(
-                        facecolor=C_WIN, label="pairs & (pairs≪d) [4-in-row!]"
-                    ),
-                ]
-                ax.legend(
-                    handles=legend_elements,
-                    loc="upper center",
-                    fontsize=6,
-                    ncol=1,
-                    framealpha=0.9,
-                    bbox_to_anchor=(0.5, -0.02),
-                )
-
-                win_text = f"{'WIN DETECTED' if has_win else '— no win'} ({direction}, d={shift})"
-                ax.set_title(
-                    win_text,
-                    fontsize=8,
-                    fontweight="bold",
-                    color=C_WIN if has_win else "#2c3e50",
-                )
-
-                fig.tight_layout(pad=0.5)
-                display(fig)
-                plt.close(fig)
 
     def _compute_winning_positions(self, player_bb: int) -> int:
         """Pure-Python reimplementation of Board::winningPositions for visualization."""
@@ -812,52 +748,85 @@ class BitboardVisualizer:
         </div>
         """
 
+    _EXPLANATIONS = {
+        "allTokens": """
+            <b>allTokens</b> — a single <code>uint64_t</code> with a 1-bit for every piece on the board
+            (both players combined).
+        """,
+        "activePTokens": """
+            <b>activePTokens</b> — a <code>uint64_t</code> holding only the <i>current</i> player's pieces.
+            After each move the engine swaps perspective with <code>activePTokens ^= allTokens</code>.
+        """,
+        "Opponent Tokens (active XOR all)": """
+            <b>Opponent Tokens</b> — derived via <code>activePTokens ⊕ allTokens</code> (XOR).<br>
+            The engine stores only <i>two</i> bitboards. The opponent's pieces are never stored explicitly —
+            they fall out of XOR. After each move, <code>activePTokens ⊕= allTokens</code> swaps
+            perspective — no branching needed.
+        """,
+        "Legal Moves": """
+            <b>Legal Moves</b> — computed as <code>(allTokens + BB_BOTTOM_ROW) & BB_ALL_LEGAL</code>.<br>
+            The key trick: adding <code>BB_BOTTOM_ROW</code> (one bit per column at row 0) to
+            <code>allTokens</code> causes carry propagation <i>within each column</i>. The carry stops at
+            the first empty cell — exactly the legal move position. Masking with <code>BB_ALL_LEGAL</code>
+            removes overflow into sentinel bits. This is why each column uses 9 bits (6 + 3 sentinel):
+            the 3 extra bits absorb carry from full columns.
+        """,
+        "Winning Positions (current player)": """
+            <b>Winning Positions</b> — cells where placing a token completes a four-in-a-row.<br>
+            Computed by checking all 4 directions (vertical, horizontal, 2 diagonals) using bit shifts.
+            Orange highlighted cells are <i>threats</i>: winning positions that are also legal moves.
+        """,
+        "Bit Index Map": """
+            <b>Bit Index Map</b> — shows which bit in the <code>uint64_t</code> corresponds to each cell.<br>
+            Column <i>c</i> occupies bits <code>[c×9 .. c×9+5]</code> (rows 0–5) plus 3 sentinel bits
+            <code>[c×9+6 .. c×9+8]</code>. Total: 63 bits used, bit 63 is unused.
+            This non-contiguous layout enables the carry-propagation trick for legal move generation.
+        """,
+    }
+
     def _update_explanation(self) -> None:
-        overlay = self._selected_overlay
-        explanations = {
-            "None": """
-                <b>Opponent Tokens</b> — derived via <code>activePTokens ⊕ allTokens</code> (XOR).<br>
-                The engine stores only <i>two</i> bitboards. The active player's pieces are in <code>activePTokens</code>.
-                The opponent's pieces are obtained by XOR with <code>allTokens</code>.
-                After each move, <code>activePTokens ⊕= allTokens</code> swaps perspective — no branching needed.
+        dir_name = self._dd_direction.value
+        d = WIN_DIRECTIONS[dir_name]
+        explanations = dict(self._EXPLANATIONS)
+        explanations.update({
+            "y (last player)": f"""
+                <b>y</b> — bits of the player who just moved (<code>activePTokens ^ allTokens</code>).
+                <code>hasWin()</code> checks this player. Currently: <b>{dir_name}</b>, d={d}.
             """,
-            "Legal Moves": """
-                <b>Legal Moves</b> — computed as <code>(allTokens + BB_BOTTOM_ROW) & BB_ALL_LEGAL</code>.<br>
-                The key trick: adding <code>BB_BOTTOM_ROW</code> (one bit per column at row 0) to <code>allTokens</code>
-                causes carry propagation <i>within each column</i>. The carry stops at the first empty cell — exactly the
-                legal move position. Masking with <code>BB_ALL_LEGAL</code> removes overflow into sentinel bits.
-                This is why each column uses 9 bits (6 + 3 sentinel): the 3 extra bits absorb carry from full columns.
+            "y << d": f"""
+                <b>y &lt;&lt; d</b> — shift y by d={d} bits. Each 1-bit moves one step in the
+                {dir_name} direction. Compare with <b>y</b> to see which bits have a neighbor.
             """,
-            "Winning Positions (current player)": """
-                <b>Winning Positions</b> — cells where placing a token completes a four-in-a-row.<br>
-                Computed by checking all 4 directions (vertical, horizontal, 2 diagonals) using bit shifts.
-                Orange highlighted cells are <i>threats</i>: winning positions that are also legal moves.
+            "y << 2d": f"""
+                <b>y &lt;&lt; 2d</b> — shift y by 2d={2 * d} bits. Each 1-bit jumps two steps in the
+                {dir_name} direction. The AND with y in the next step finds "pairs".
             """,
-            "Bit Index Map": """
-                <b>Bit Index Map</b> — shows which bit in the <code>uint64_t</code> corresponds to each cell.<br>
-                Column <i>c</i> occupies bits <code>[c×9 .. c×9+5]</code> (rows 0–5) plus 3 sentinel bits
-                <code>[c×9+6 .. c×9+8]</code>. Total: 63 bits used, bit 63 is unused.
-                This non-contiguous layout enables the carry-propagation trick for legal move generation.
+            "y & (y << 2d)  [=pairs]": f"""
+                <b>pairs = y &amp; (y &lt;&lt; 2d)</b> — bits that have a matching bit {2 * d} positions away.
+                Each 1-bit here anchors at least two tokens separated by 2 in the {dir_name} direction.
             """,
-        }
+            "pairs << d": f"""
+                <b>pairs &lt;&lt; d</b> — shift pairs by d={d}. If any of these bits overlap with
+                the original pairs, four consecutive tokens exist.
+            """,
+            "pairs & (pairs << d)  [=win?]": f"""
+                <b>pairs &amp; (pairs &lt;&lt; d)</b> — the final AND. Non-zero ⇒ <b>four-in-a-row found</b>
+                in the {dir_name} direction (d={d}).
+            """,
+        })
 
-        for dir_name in WIN_DIRECTIONS:
-            shift = WIN_DIRECTIONS[dir_name]
-            explanations[f"Win Check: {dir_name}"] = f"""
-                <b>Win Detection — {dir_name}</b> (shift distance d={shift})<br>
-                <b>Step 1:</b> <code>pairs = y & (y ≪ 2d)</code> — finds bits that have a matching bit
-                two positions away in this direction (potential middle of 4-in-a-row).<br>
-                <b>Step 2:</b> <code>result = pairs & (pairs ≪ d)</code> — checks if two such pairs overlap,
-                confirming four consecutive bits. Non-zero ⇒ win found.<br>
-                <span style="color: {C_BIT_ON};">■</span> player bits &nbsp;
-                <span style="color: {C_THREAT};">■</span> pairs (step 1) &nbsp;
-                <span style="color: {C_WIN};">■</span> four-in-a-row confirmed (step 2)
-            """
+        # Collect unique explanations from all 3 panels
+        seen = set()
+        parts = []
+        for overlay in self._selected_overlays:
+            if overlay not in seen and overlay in explanations:
+                seen.add(overlay)
+                parts.append(explanations[overlay].strip())
 
-        text = explanations.get(overlay, "")
+        combined = "<hr style='margin: 6px 0; border-color: #ffc107;'>".join(parts)
         self._html_explain.value = f"""
         <div style="font-family: sans-serif; font-size: 13px; background: #fff3cd; padding: 12px;
                     border-radius: 8px; border: 1px solid #ffc107; line-height: 1.6;">
-            💡 {text.strip()}
+            {combined}
         </div>
         """
