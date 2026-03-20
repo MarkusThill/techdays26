@@ -85,16 +85,6 @@ WIN_DIRECTIONS = {
     "Diag \\": COL_BIT_OFFSET + 1,
 }
 
-# Win detection steps — parameterized by d (direction shift)
-WIN_STEPS = [
-    "y (last player)",
-    "y << d",
-    "y << 2d",
-    "y & (y << 2d)  [=pairs]",
-    "pairs << d",
-    "pairs & (pairs << d)  [=win?]",
-]
-
 # Colors
 C_EMPTY = "#2c3e50"
 C_YELLOW = "#f1c40f"
@@ -157,7 +147,7 @@ class BitboardVisualizer:
         "Legal Moves",
         "Winning Positions (current player)",
         "Bit Index Map",
-    ] + WIN_STEPS
+    ]
 
     def __init__(self, init_moves: str = "") -> None:
         self._board = Board(init_moves) if init_moves else Board()
@@ -236,14 +226,15 @@ class BitboardVisualizer:
         )
         self._btn_reset.on_click(self._on_reset)
 
-        # Direction selector for win-detection steps (shared across all panels)
+        # Win detection pipeline section
         self._dd_direction = Dropdown(
             options=list(WIN_DIRECTIONS.keys()),
             value="Vert",
-            description="d =",
-            layout=Layout(width="200px"),
+            description="Direction:",
+            layout=Layout(width="220px"),
         )
         self._dd_direction.observe(lambda _: self._refresh_all(), names="value")
+        self._out_pipeline = Output(layout=Layout(width="100%"))
 
         # ── Explanation panel ──
         self._html_explain = HTML(layout=Layout(width="100%", padding="8px"))
@@ -251,7 +242,7 @@ class BitboardVisualizer:
     def show(self) -> None:
         """Display the widget in the notebook."""
         top_controls = HBox(
-            [self._txt_moves, self._btn_undo, self._btn_reset, self._dd_direction],
+            [self._txt_moves, self._btn_undo, self._btn_reset],
             layout=Layout(align_items="center", gap="8px"),
         )
 
@@ -267,6 +258,22 @@ class BitboardVisualizer:
             layout=Layout(gap="4px"),
         )
 
+        # Win detection pipeline section
+        pipeline_section = VBox(
+            [
+                HBox(
+                    [
+                        HTML(
+                            "<b>Win Detection Pipeline</b> &nbsp; <code>hasWin()</code> — "
+                        ),
+                        self._dd_direction,
+                    ],
+                    layout=Layout(align_items="center"),
+                ),
+                self._out_pipeline,
+            ],
+        )
+
         layout = VBox(
             [
                 HTML("<h2>🔬 BitBully — Bitboard Internals Visualizer</h2>"),
@@ -275,6 +282,7 @@ class BitboardVisualizer:
                 grids,
                 self._html_info,
                 self._html_binary,
+                pipeline_section,
                 self._html_explain,
             ],
             layout=Layout(padding="10px"),
@@ -332,6 +340,7 @@ class BitboardVisualizer:
         self._draw_board()
         for i in range(3):
             self._draw_overlay_panel(i, all_tokens, active_tokens)
+        self._draw_pipeline(all_tokens, active_tokens)
         self._update_info(all_tokens, active_tokens, moves_left)
         self._update_binary(all_tokens, active_tokens)
         self._update_explanation()
@@ -541,43 +550,126 @@ class BitboardVisualizer:
             self._draw_bit_index_map(out)
             return
 
-        # Win detection steps — d comes from the shared direction dropdown
+    def _draw_pipeline(self, all_tokens: int, active_tokens: int) -> None:
+        """Draw the full win-detection pipeline as 6 subplots in one figure."""
         dir_name = self._dd_direction.value
         d = WIN_DIRECTIONS[dir_name]
         y = (active_tokens ^ all_tokens) & BB_ALL_LEGAL
         pairs = y & (y << (2 * d)) & BB_ALL_LEGAL
+        result = pairs & (pairs << d) & BB_ALL_LEGAL
+        has_win = result != 0
 
-        if overlay == "y (last player)":
-            self._draw_bitboard_grid(out, y, f"y  ({dir_name}, d={d})", C_BIT_ON)
-        elif overlay == "y << d":
-            self._draw_bitboard_grid(
-                out, (y << d) & BB_ALL_LEGAL, f"y << {d}  ({dir_name})", C_BIT_ON
+        steps = [
+            ("y", y),
+            (f"y << {d}", (y << d) & BB_ALL_LEGAL),
+            (f"y << {2 * d}", (y << (2 * d)) & BB_ALL_LEGAL),
+            (f"y & (y << {2 * d})\n= pairs", pairs),
+            (f"pairs << {d}", (pairs << d) & BB_ALL_LEGAL),
+            (f"pairs & (pairs << {d})\n= win?", result),
+        ]
+
+        self._out_pipeline.clear_output(wait=True)
+        with self._out_pipeline:
+            n_steps = len(steps)
+            fig, axes = plt.subplots(
+                1,
+                n_steps,
+                figsize=(n_steps * 2.6, 3.2),
+                gridspec_kw={"wspace": 0.35},
             )
-        elif overlay == "y << 2d":
-            self._draw_bitboard_grid(
-                out,
-                (y << (2 * d)) & BB_ALL_LEGAL,
-                f"y << {2 * d}  ({dir_name})",
-                C_BIT_ON,
-            )
-        elif overlay == "y & (y << 2d)  [=pairs]":
-            self._draw_bitboard_grid(
-                out, pairs, f"y & (y << {2 * d})  ({dir_name})", C_THREAT
-            )
-        elif overlay == "pairs << d":
-            self._draw_bitboard_grid(
-                out,
-                (pairs << d) & BB_ALL_LEGAL,
-                f"pairs << {d}  ({dir_name})",
-                C_THREAT,
-            )
-        elif overlay == "pairs & (pairs << d)  [=win?]":
-            result = pairs & (pairs << d) & BB_ALL_LEGAL
-            color = C_WIN if result else C_BIT_ON
-            label = f"pairs & (pairs << {d})  ({dir_name})"
-            if result:
-                label += "  WIN!"
-            self._draw_bitboard_grid(out, result, label, color)
+            fig.patch.set_facecolor("#f8f9fa")
+
+            for ax_idx, (title, bb) in enumerate(steps):
+                ax = axes[ax_idx]
+                ax.set_facecolor("#ffffff")
+
+                total_rows = N_ROWS + 3
+                for c in range(N_COLS):
+                    for r in range(total_rows):
+                        bit = c * COL_BIT_OFFSET + r
+                        is_sentinel = bit in SENTINEL_BITS
+                        is_on = _bit_set(bb, bit) and not is_sentinel
+
+                        if is_sentinel:
+                            fc = C_SENTINEL
+                        elif is_on:
+                            # Last step: red for win, orange for pairs steps
+                            if ax_idx == n_steps - 1 and has_win:
+                                fc = C_WIN
+                            elif ax_idx >= 3:
+                                fc = C_THREAT
+                            else:
+                                fc = C_BIT_ON
+                        else:
+                            fc = C_BIT_OFF
+
+                        rect = mpatches.FancyBboxPatch(
+                            (c + 0.05, r + 0.05),
+                            0.9,
+                            0.9,
+                            boxstyle="round,pad=0.04",
+                            facecolor=fc,
+                            edgecolor="#bdc3c7",
+                            linewidth=0.4,
+                        )
+                        ax.add_patch(rect)
+
+                        txt_c = "white" if (is_on or is_sentinel) else "#ccc"
+                        ax.text(
+                            c + 0.5,
+                            r + 0.5,
+                            "1" if is_on else ("" if is_sentinel else ""),
+                            ha="center",
+                            va="center",
+                            fontsize=6,
+                            fontweight="bold",
+                            color=txt_c,
+                            fontfamily="monospace",
+                        )
+
+                ax.set_xlim(0, N_COLS)
+                ax.set_ylim(0, total_rows)
+                ax.set_xticks([])
+                ax.set_yticks([])
+                ax.set_aspect("equal")
+
+                # Separator line
+                ax.axhline(
+                    y=N_ROWS + 0.02,
+                    color="#e74c3c",
+                    linewidth=1,
+                    linestyle="--",
+                    alpha=0.5,
+                )
+
+                ax.set_title(
+                    title,
+                    fontsize=7,
+                    fontweight="bold",
+                    fontfamily="monospace",
+                    pad=4,
+                )
+
+            fig.subplots_adjust(wspace=0.35)
+
+            # Arrows between subplots (must run after layout is settled)
+            for ax_idx in range(n_steps - 1):
+                bbox = axes[ax_idx].get_position()
+                next_bbox = axes[ax_idx + 1].get_position()
+                mid_y = (bbox.y0 + bbox.y1) / 2
+                fig.text(
+                    (bbox.x1 + next_bbox.x0) / 2,
+                    mid_y,
+                    "-->",
+                    ha="center",
+                    va="center",
+                    fontsize=9,
+                    fontweight="bold",
+                    color="#7f8c8d",
+                    fontfamily="monospace",
+                )
+            display(fig)
+            plt.close(fig)
 
     def _draw_bit_index_map(self, out: Output) -> None:
         """Draw a grid showing the bit index assigned to each cell."""
@@ -785,35 +877,7 @@ class BitboardVisualizer:
     }
 
     def _update_explanation(self) -> None:
-        dir_name = self._dd_direction.value
-        d = WIN_DIRECTIONS[dir_name]
         explanations = dict(self._EXPLANATIONS)
-        explanations.update({
-            "y (last player)": f"""
-                <b>y</b> — bits of the player who just moved (<code>activePTokens ^ allTokens</code>).
-                <code>hasWin()</code> checks this player. Currently: <b>{dir_name}</b>, d={d}.
-            """,
-            "y << d": f"""
-                <b>y &lt;&lt; d</b> — shift y by d={d} bits. Each 1-bit moves one step in the
-                {dir_name} direction. Compare with <b>y</b> to see which bits have a neighbor.
-            """,
-            "y << 2d": f"""
-                <b>y &lt;&lt; 2d</b> — shift y by 2d={2 * d} bits. Each 1-bit jumps two steps in the
-                {dir_name} direction. The AND with y in the next step finds "pairs".
-            """,
-            "y & (y << 2d)  [=pairs]": f"""
-                <b>pairs = y &amp; (y &lt;&lt; 2d)</b> — bits that have a matching bit {2 * d} positions away.
-                Each 1-bit here anchors at least two tokens separated by 2 in the {dir_name} direction.
-            """,
-            "pairs << d": f"""
-                <b>pairs &lt;&lt; d</b> — shift pairs by d={d}. If any of these bits overlap with
-                the original pairs, four consecutive tokens exist.
-            """,
-            "pairs & (pairs << d)  [=win?]": f"""
-                <b>pairs &amp; (pairs &lt;&lt; d)</b> — the final AND. Non-zero ⇒ <b>four-in-a-row found</b>
-                in the {dir_name} direction (d={d}).
-            """,
-        })
 
         # Collect unique explanations from all 3 panels
         seen = set()
@@ -822,6 +886,10 @@ class BitboardVisualizer:
             if overlay not in seen and overlay in explanations:
                 seen.add(overlay)
                 parts.append(explanations[overlay].strip())
+
+        if not parts:
+            self._html_explain.value = ""
+            return
 
         combined = "<hr style='margin: 6px 0; border-color: #ffc107;'>".join(parts)
         self._html_explain.value = f"""
