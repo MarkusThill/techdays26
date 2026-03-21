@@ -20,8 +20,10 @@ Usage::
 
 from __future__ import annotations
 
+import importlib.resources
 import textwrap
 from collections.abc import Sequence
+from pathlib import Path
 
 import matplotlib
 import matplotlib.colors as mcolors
@@ -160,6 +162,14 @@ class BitboardVisualizer:
             "Opponent Tokens (active XOR all)",
         ]
 
+        # ── Load board tile PNGs from bitbully assets ──
+        _assets = Path(str(importlib.resources.files("bitbully").joinpath("assets")))
+        self._png = {
+            0: plt.imread(_assets / "empty.png"),
+            1: plt.imread(_assets / "yellow.png"),
+            2: plt.imread(_assets / "red.png"),
+        }
+
         # ── Build widgets ──
         self._build_widgets()
         self._refresh_all()
@@ -169,13 +179,13 @@ class BitboardVisualizer:
     # ──────────────────────────────────────────────────────────────
     def _build_widgets(self) -> None:
         # Main board output (matplotlib)
-        self._out_board = Output(layout=Layout(width="auto"))
+        self._out_board = Output(layout=Layout(width="auto", overflow="hidden"))
 
         # 3 overlay panel outputs + dropdowns
         self._out_panels: list[Output] = []
         self._dd_panels: list[Dropdown] = []
         for i in range(3):
-            out = Output(layout=Layout(width="auto"))
+            out = Output(layout=Layout(width="auto", overflow="hidden"))
             dd = Dropdown(
                 options=self.OVERLAY_OPTIONS,
                 value=self._selected_overlays[i],
@@ -204,17 +214,33 @@ class BitboardVisualizer:
         )
         self._txt_moves.observe(self._on_moves_change, names="value")
 
-        # Column buttons for interactive play
+        # Column buttons — width matched to board figure column width (mirrors gui_c4.py)
+        _fig_tmp = plt.figure(figsize=(N_COLS * 0.5, N_ROWS * 0.5))
+        _fig_px = _fig_tmp.get_size_inches() * _fig_tmp.dpi
+        plt.close(_fig_tmp)
+        _btn_w = int(_fig_px[0] / N_COLS) - 4
+
         col_buttons = []
         for c in range(N_COLS):
             btn = Button(
                 description=f"⏬{c}",
-                layout=Layout(width="50px", height="32px"),
+                layout=Layout(width=f"{_btn_w}px", height="32px"),
                 button_style="primary",
             )
             btn.on_click(lambda _, col=c: self._on_col_click(col))
             col_buttons.append(btn)
-        self._hbox_cols = HBox(col_buttons)
+
+        # Left-padding spacer aligns buttons to the board columns (mirrors gui_c4.py)
+        _pad_vbox = VBox(layout=Layout(padding="0px 0px 0px 6px"))
+        self._hbox_cols = HBox(
+            [_pad_vbox, *col_buttons],
+            layout=Layout(
+                display="flex",
+                flex_flow="row wrap",
+                justify_content="center",
+                align_items="center",
+            ),
+        )
 
         # Control buttons
         self._btn_undo = Button(
@@ -234,7 +260,7 @@ class BitboardVisualizer:
             layout=Layout(width="220px"),
         )
         self._dd_direction.observe(lambda _: self._refresh_all(), names="value")
-        self._out_pipeline = Output(layout=Layout(width="100%"))
+        self._out_pipeline = Output(layout=Layout(width="100%", overflow="hidden"))
 
         # ── Explanation panel ──
         self._html_explain = HTML(layout=Layout(width="100%", padding="8px"))
@@ -246,16 +272,17 @@ class BitboardVisualizer:
             layout=Layout(align_items="center", gap="8px"),
         )
 
-        board_label = HTML("<b>Board State</b>")
-
         # Build 3 overlay columns, each with dropdown + output
         overlay_cols = []
         for i in range(3):
             overlay_cols.append(VBox([self._dd_panels[i], self._out_panels[i]]))
 
+        # Board section: column buttons stacked directly above board figure (mirrors gui_c4.py)
+        board_section = VBox([self._hbox_cols, self._out_board])
+
         grids = HBox(
-            [VBox([board_label, self._out_board])] + overlay_cols,
-            layout=Layout(gap="4px"),
+            [board_section] + overlay_cols,
+            layout=Layout(gap="4px", flex_flow="row nowrap", overflow="hidden"),
         )
 
         # Win detection pipeline section
@@ -278,7 +305,6 @@ class BitboardVisualizer:
             [
                 HTML("<h2>🔬 BitBully — Bitboard Internals Visualizer</h2>"),
                 top_controls,
-                self._hbox_cols,
                 grids,
                 self._html_info,
                 self._html_binary,
@@ -346,46 +372,23 @@ class BitboardVisualizer:
         self._update_explanation()
 
     def _draw_board(self) -> None:
-        """Draw the Connect-4 board state."""
+        """Draw the Connect-4 board using BitBully PNG tile assets."""
         self._out_board.clear_output(wait=True)
         with self._out_board:
-            fig, ax = plt.subplots(1, 1, figsize=(4.0, 3.8))
-            fig.patch.set_facecolor("#34495e")
-            ax.set_facecolor("#2c3e50")
-
-            arr = self._board.to_array()  # 7×6 column-major
-            for c in range(N_COLS):
-                for r in range(N_ROWS):
-                    val = arr[c][r]
-                    if val == 1:
-                        color = C_YELLOW
-                    elif val == 2:
-                        color = C_RED
-                    else:
-                        color = "#3d566e"
-                    circle = plt.Circle(
-                        (c + 0.5, r + 0.5),
-                        0.38,
-                        color=color,
-                        ec="white",
-                        linewidth=0.5,
-                    )
-                    ax.add_patch(circle)
-
-            ax.set_xlim(0, N_COLS)
-            ax.set_ylim(0, N_ROWS)
-            ax.set_xticks(np.arange(N_COLS) + 0.5)
-            ax.set_xticklabels(
-                [str(i) for i in range(N_COLS)], color="white", fontsize=9
+            fig, axs = plt.subplots(
+                N_ROWS,
+                N_COLS,
+                figsize=(N_COLS * 0.5, N_ROWS * 0.5),
             )
-            ax.set_yticks(np.arange(N_ROWS) + 0.5)
-            # Row labels: bottom row (R0) at bottom, top row (R5) at top
-            ax.set_yticklabels(
-                [str(i) for i in range(N_ROWS)], color="white", fontsize=9
+            arr = self._board.to_array()  # column-major: arr[col][row], row 0 = bottom
+            for r in range(N_ROWS):
+                for c in range(N_COLS):
+                    ax = axs[r][c]
+                    ax.imshow(self._png[arr[c][N_ROWS - 1 - r]])
+                    ax.axis("off")
+            plt.subplots_adjust(
+                wspace=0.05, hspace=0.05, left=0, right=1, top=1, bottom=0
             )
-            ax.tick_params(length=0)
-            ax.set_aspect("equal")
-            fig.tight_layout(pad=0.5)
             display(fig)
             plt.close(fig)
 
