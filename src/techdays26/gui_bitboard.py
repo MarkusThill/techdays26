@@ -4,7 +4,7 @@ This module provides a Jupyter notebook widget that illustrates the internal
 bitboard representation used by the BitBully Connect-4 engine. It visualizes:
 
 - The 64-bit layout with 7 columns × 9 bits (6 playable + 3 sentinel)
-- The two core bitboards: allTokens and activePTokens
+- The two core bitboards: all_tokens and active_tokens
 - Derived boards: each player's tokens via XOR
 - Legal move generation via carry-propagation trick
 - Win detection via shift-AND operations
@@ -143,11 +143,11 @@ class BitboardVisualizer:
     """Interactive bitboard visualization widget for Jupyter notebooks."""
 
     OVERLAY_OPTIONS = [
-        "allTokens",
-        "activePTokens",
-        "Opponent Tokens (active XOR all)",
-        "Legal Moves",
-        "Winning Positions (current player)",
+        "all_tokens",
+        "active_tokens",
+        "opponent_tokens  (active_tokens ⊕ all_tokens)",
+        "legal_moves",
+        "winning_positions  (current player)",
         "Bit Index Map",
     ]
 
@@ -157,9 +157,9 @@ class BitboardVisualizer:
 
         # ── UI state: 3 overlay selections ──
         self._selected_overlays = [
-            "allTokens",
-            "activePTokens",
-            "Opponent Tokens (active XOR all)",
+            "all_tokens",
+            "active_tokens",
+            "opponent_tokens  (active_tokens ⊕ all_tokens)",
         ]
 
         # ── Load board tile PNGs from bitbully assets ──
@@ -291,7 +291,7 @@ class BitboardVisualizer:
                 HBox(
                     [
                         HTML(
-                            "<b>Win Detection Pipeline</b> &nbsp; <code>hasWin()</code> — "
+                            "<b>Win Detection Pipeline</b> &nbsp; <code>has_win()</code> — "
                         ),
                         self._dd_direction,
                     ],
@@ -510,39 +510,39 @@ class BitboardVisualizer:
         out = self._out_panels[panel_idx]
         overlay = self._selected_overlays[panel_idx]
 
-        if overlay == "allTokens":
-            self._draw_bitboard_grid(out, all_tokens, "allTokens", C_BIT_ON)
+        if overlay == "all_tokens":
+            self._draw_bitboard_grid(out, all_tokens, "all_tokens", C_BIT_ON)
             return
 
-        if overlay == "activePTokens":
-            self._draw_bitboard_grid(out, active_tokens, "activePTokens", C_HIGHLIGHT)
+        if overlay == "active_tokens":
+            self._draw_bitboard_grid(out, active_tokens, "active_tokens", C_HIGHLIGHT)
             return
 
-        if overlay == "Opponent Tokens (active XOR all)":
+        if overlay == "opponent_tokens  (active_tokens ⊕ all_tokens)":
             opponent = active_tokens ^ all_tokens
-            self._draw_bitboard_grid(out, opponent, "Opponent Tokens", "#e67e22")
+            self._draw_bitboard_grid(out, opponent, "opponent_tokens", "#e67e22")
             return
 
-        if overlay == "Legal Moves":
+        if overlay == "legal_moves":
             legal = (all_tokens + BB_BOTTOM_ROW) & BB_ALL_LEGAL
             self._draw_bitboard_grid(
                 out,
                 0,
-                "Legal Moves",
+                "legal_moves",
                 C_BIT_ON,
                 highlight_mask=legal,
                 highlight_color=C_LEGAL,
             )
             return
 
-        if overlay == "Winning Positions (current player)":
+        if overlay == "winning_positions  (current player)":
             wp = self._compute_winning_positions(active_tokens)
             legal = (all_tokens + BB_BOTTOM_ROW) & BB_ALL_LEGAL
             threats = wp & legal & ~all_tokens
             self._draw_bitboard_grid(
                 out,
                 wp & BB_ALL_LEGAL,
-                "Winning Positions",
+                "winning_positions",
                 C_BIT_ON,
                 highlight_mask=threats,
                 highlight_color=C_THREAT,
@@ -821,13 +821,17 @@ class BitboardVisualizer:
             </tr>"""
 
         rows = "".join([
-            _row("allTokens", all_tokens, C_BIT_ON),
-            _row("activePTokens", active_tokens, C_HIGHLIGHT),
-            _row("opponentTokens (active⊕all)", opponent, "#e67e22"),
+            _row("all_tokens", all_tokens, C_BIT_ON),
+            _row("active_tokens", active_tokens, C_HIGHLIGHT),
+            _row("opponent_tokens  (active_tokens ⊕ all_tokens)", opponent, "#e67e22"),
             _row("BB_BOTTOM_ROW", BB_BOTTOM_ROW, "#95a5a6"),
-            _row("allTokens + BB_BOTTOM_ROW", all_tokens + BB_BOTTOM_ROW, "#95a5a6"),
-            _row("legalMovesMask", legal, C_LEGAL),
-            _row("uid (active + all)", active_tokens + all_tokens, "#2c3e50"),
+            _row("all_tokens + BB_BOTTOM_ROW", all_tokens + BB_BOTTOM_ROW, "#95a5a6"),
+            _row("legal_moves", legal, C_LEGAL),
+            _row(
+                "uid  (active_tokens + all_tokens)",
+                active_tokens + all_tokens,
+                "#2c3e50",
+            ),
         ])
 
         self._html_binary.value = f"""
@@ -844,35 +848,35 @@ class BitboardVisualizer:
         """
 
     _EXPLANATIONS = {
-        "allTokens": """
-            <b>allTokens</b> — a single <code>uint64_t</code> with a 1-bit for every piece on the board
+        "all_tokens": """
+            <b>all_tokens</b> — a single <code>int64</code> with a 1-bit for every piece on the board
             (both players combined).
         """,
-        "activePTokens": """
-            <b>activePTokens</b> — a <code>uint64_t</code> holding only the <i>current</i> player's pieces.
-            After each move the engine swaps perspective with <code>activePTokens ^= allTokens</code>.
+        "active_tokens": """
+            <b>active_tokens</b> — an <code>int64</code> holding only the <i>current</i> player's pieces.
+            After each move the engine swaps perspective with <code>active_tokens ^= all_tokens</code>.
         """,
-        "Opponent Tokens (active XOR all)": """
-            <b>Opponent Tokens</b> — derived via <code>activePTokens ⊕ allTokens</code> (XOR).<br>
+        "opponent_tokens  (active_tokens ⊕ all_tokens)": """
+            <b>opponent_tokens</b> — derived via <code>active_tokens ⊕ all_tokens</code> (XOR).<br>
             The engine stores only <i>two</i> bitboards. The opponent's pieces are never stored explicitly —
-            they fall out of XOR. After each move, <code>activePTokens ⊕= allTokens</code> swaps
+            they fall out of XOR. After each move, <code>active_tokens ^= all_tokens</code> swaps
             perspective — no branching needed.
         """,
-        "Legal Moves": """
-            <b>Legal Moves</b> — computed as <code>(allTokens + BB_BOTTOM_ROW) & BB_ALL_LEGAL</code>.<br>
+        "legal_moves": """
+            <b>legal_moves</b> — computed as <code>(all_tokens + BB_BOTTOM_ROW) &amp; BB_ALL_LEGAL</code>.<br>
             The key trick: adding <code>BB_BOTTOM_ROW</code> (one bit per column at row 0) to
-            <code>allTokens</code> causes carry propagation <i>within each column</i>. The carry stops at
+            <code>all_tokens</code> causes carry propagation <i>within each column</i>. The carry stops at
             the first empty cell — exactly the legal move position. Masking with <code>BB_ALL_LEGAL</code>
             removes overflow into sentinel bits. This is why each column uses 9 bits (6 + 3 sentinel):
             the 3 extra bits absorb carry from full columns.
         """,
-        "Winning Positions (current player)": """
-            <b>Winning Positions</b> — cells where placing a token completes a four-in-a-row.<br>
+        "winning_positions  (current player)": """
+            <b>winning_positions</b> — cells where placing a token completes a four-in-a-row.<br>
             Computed by checking all 4 directions (vertical, horizontal, 2 diagonals) using bit shifts.
             Orange highlighted cells are <i>threats</i>: winning positions that are also legal moves.
         """,
         "Bit Index Map": """
-            <b>Bit Index Map</b> — shows which bit in the <code>uint64_t</code> corresponds to each cell.<br>
+            <b>Bit Index Map</b> — shows which bit in the <code>int64</code> corresponds to each cell.<br>
             Column <i>c</i> occupies bits <code>[c×9 .. c×9+5]</code> (rows 0–5) plus 3 sentinel bits
             <code>[c×9+6 .. c×9+8]</code>. Total: 63 bits used, bit 63 is unused.
             This non-contiguous layout enables the carry-propagation trick for legal move generation.
