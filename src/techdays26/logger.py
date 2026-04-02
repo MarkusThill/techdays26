@@ -1,13 +1,15 @@
 from __future__ import annotations
 
+import copy
 import json
 import time
 from pathlib import Path
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING, Callable, Union
 
 import torch
 
 if TYPE_CHECKING:
+    from techdays26.ntuple_network import NTupleNetwork
     from techdays26.torch_board import BoardBatch
 
 
@@ -15,13 +17,18 @@ class TrainingLogger:
     """Periodic console logging and arena evaluation for the TD training loop.
 
     Args:
-        repeat_dir:  Output directory for this repeat's files.
-        n_evaluate:  Run arena evaluation every this many steps.
-        n_truncate:  TD lookahead horizon (stored for reference).
-        n_repeats:   Total number of repeats (used to prefix log lines).
-        repeat_idx:  Index of the current repeat (0-based).
-        evaluate_fn: Callable that accepts a weights path and returns an
-                     ArenaResult.  Signature: ``evaluate_fn(weights_path: str)``.
+        repeat_dir:   Output directory for this repeat's files.
+        n_evaluate:   Run arena evaluation every this many steps.
+        n_truncate:   TD lookahead horizon (stored for reference).
+        n_repeats:    Total number of repeats (used to prefix log lines).
+        repeat_idx:   Index of the current repeat (0-based).
+        evaluate_fn:  Callable that accepts either a weights path (str) or a
+                      deep-copied CPU NTupleNetwork and returns an ArenaResult.
+                      Signature: ``evaluate_fn(weights_path_or_net)``.
+        save_weights: If True (default), save model weights to disk at each
+                      evaluation step and pass the file path to evaluate_fn.
+                      If False, pass a deep-copied CPU snapshot of the network
+                      directly — no disk I/O.
     """
 
     def __init__(
@@ -31,7 +38,9 @@ class TrainingLogger:
         n_truncate: int,
         n_repeats: int,
         repeat_idx: int,
-        evaluate_fn: Callable[[str], object],
+        evaluate_fn: Callable[[Union[str, "NTupleNetwork"]], object],
+        *,
+        save_weights: bool = True,
     ) -> None:
         self._dir = repeat_dir
         self._n_eval = n_evaluate
@@ -39,6 +48,7 @@ class TrainingLogger:
         self._n_repeats = n_repeats
         self._ri = repeat_idx
         self._eval_fn = evaluate_fn
+        self._save_weights = save_weights
 
         self._metrics_path = repeat_dir / "0_metrics.json"
         self._arena_path = repeat_dir / "0_arena_metrics.json"
@@ -152,9 +162,17 @@ class TrainingLogger:
         # ── Arena evaluation every n_evaluate steps ───────────────────────
         if step % self._n_eval == 0:
             print(f"{pfx}evaluate at step {step}...")
-            weights_path = str(self._dir / f"step_{step}_model_weights.pt")
-            net.save(weights_path)
-            result = self._eval_fn(weights_path)
+            # Deep-copy onto CPU before any disk or arena work so the training
+            # tensors on the original device are never touched by the arena.
+            net_snapshot = copy.deepcopy(net).cpu()
+            net_snapshot.eval()
+            if self._save_weights:
+                weights_path = str(self._dir / f"step_{step}_model_weights.pt")
+                net_snapshot.save(weights_path)
+                eval_arg: Union[str, "NTupleNetwork"] = weights_path
+            else:
+                eval_arg = net_snapshot
+            result = self._eval_fn(eval_arg)
 
             result.save_json(str(self._dir / f"step_{step}_arena_result.json"))
             self._all_arena.append({

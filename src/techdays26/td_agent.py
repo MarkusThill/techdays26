@@ -19,9 +19,17 @@ class TDConnect4AgentTorch:
         self,
         model_path: str | None = None,
         *,
+        model: NTupleNetwork | None = None,
         tie_break: str = "center",
     ) -> None:
-        net2 = NTupleNetwork.load(model_path, device="cpu")
+        if model is not None and model_path is not None:
+            raise ValueError("Provide model_path or model, not both.")
+        if model is not None:
+            net2 = model.cpu()
+        elif model_path is not None:
+            net2 = NTupleNetwork.load(model_path, device="cpu")
+        else:
+            raise ValueError("Provide either model_path or model.")
         net2.eval()
         self._tie_break = tie_break
         self._eval = net2
