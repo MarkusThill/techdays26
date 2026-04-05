@@ -202,8 +202,8 @@ class NTupleVisualizer:
 
         # Model loader
         self._txt_model_path = Text(
-            value="td_weights_clean.tdw.zip",
-            placeholder="path/to/model.tdw.zip",
+            value="",
+            placeholder="path/to/model.pt or .tdw.zip",
             layout=Layout(width="260px"),
         )
         self._btn_load = Button(
@@ -326,8 +326,76 @@ class NTupleVisualizer:
 
     # ── Model loading ──────────────────────────────────────────────────────────
 
+    @staticmethod
+    def _bitidx_to_std(bit_idx: int, col_height: int = 6, stride: int = 9) -> int:
+        """Convert a single bitboard index (col*9+row) to standard index (col*6+row)."""
+        col = bit_idx // stride
+        row = bit_idx % stride
+        return col * col_height + row
+
+    def _load_pt_model(self, path: str) -> None:
+        """Load a .pt NTupleNetwork and convert to TwoPlayerWeights."""
+        from techdays26.legacy_ntuple_agent import (
+            TupleLUT,
+            PlayerWeights,
+            TwoPlayerWeights,
+        )
+        from techdays26.ntuple_network import NTupleNetwork
+
+        model = NTupleNetwork.load(path, device="cpu")
+        model.eval()
+
+        M, N, K = model.M, model.N, model.K
+        bit_patterns = model.n_tuple_tensor.cpu().tolist()  # [M, N]
+        W = model.W.detach().cpu().numpy()  # [2, M, K]
+
+        def _make_luts(player: int) -> tuple[TupleLUT, ...]:
+            luts = []
+            for m, bit_idxs in enumerate(bit_patterns):
+                std_idxs = np.array(
+                    [self._bitidx_to_std(b) for b in bit_idxs], dtype=np.int32
+                )
+                std_idxs_m = np.array(_mirror_std(std_idxs.tolist()), dtype=np.int32)
+                luts.append(
+                    TupleLUT(
+                        n=N,
+                        m=m,
+                        idxs=std_idxs,
+                        idxs_m=std_idxs_m,
+                        lut=W[player, m, :].astype(np.float64),
+                    )
+                )
+            return tuple(luts)
+
+        weights = TwoPlayerWeights(
+            p0=PlayerWeights(t=M, p=P, luts=_make_luts(0)),
+            p1=PlayerWeights(t=M, p=P, luts=_make_luts(1)),
+        )
+        self._weights = weights
+        self._patterns = [
+            _Pattern(
+                f"#{i:03d}  (n={lut.n})",
+                list(map(int, lut.idxs)),
+                list(map(int, lut.idxs_m)),
+            )
+            for i, lut in enumerate(weights.p0.luts)
+        ]
+        self._sel_idx = 0
+        self._dd_pattern.options = [p.name for p in self._patterns]
+        self._dd_pattern.value = self._patterns[0].name
+        self._lbl_model.value = (
+            f"<span style='color:#27ae60;font-family:monospace'>"
+            f" ✓ {Path(path).name}  ({M} patterns, n={N}, "
+            f"LUT size={K:,})</span>"
+        )
+        self._refresh_all()
+
     def _load_model(self, path: str) -> None:
         try:
+            if path.endswith(".pt"):
+                self._load_pt_model(path)
+                return
+
             from techdays26.legacy_ntuple_agent import import_two_player_weights_zip
 
             weights = import_two_player_weights_zip(path, int_dtype=np.int32)
