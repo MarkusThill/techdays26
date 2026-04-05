@@ -36,22 +36,24 @@ SCENARIOS = [
         "path_b": [2, 4, 3],  # Y c2, R c4, Y c3
     },
     {
-        "name": "Red's columns swapped (5 moves)",
+        "name": "Different last move (5 moves)",
         "desc": (
-            "Yellow plays the same moves, but Red responds in different columns. "
-            "The final position is identical."
+            "State A has Yellow at c3,c4 — Yellow plays c5. "
+            "State B has Yellow at c5,c4 — Yellow plays c3. "
+            "Different states, different actions, same afterstate!"
         ),
         "path_a": [3, 0, 4, 6, 5],  # Y c3, R c0, Y c4, R c6, Y c5
-        "path_b": [3, 6, 4, 0, 5],  # Y c3, R c6, Y c4, R c0, Y c5
+        "path_b": [5, 0, 4, 6, 3],  # Y c5, R c0, Y c4, R c6, Y c3
     },
     {
-        "name": "Full reorder (7 moves)",
+        "name": "Longer game, swapped moves (7 moves)",
         "desc": (
-            "Both Yellow and Red play the same columns but in a completely "
-            "different order. The afterstate is identical."
+            "State A has Yellow at c0,c1,c2 — Yellow plays c4. "
+            "State B has Yellow at c4,c1,c2 — Yellow plays c0. "
+            "Different states, different actions, same afterstate!"
         ),
-        "path_a": [0, 3, 1, 3, 2, 3, 0],
-        "path_b": [2, 3, 0, 3, 1, 3, 0],
+        "path_a": [0, 3, 1, 3, 2, 3, 4],  # last move c4
+        "path_b": [4, 3, 1, 3, 2, 3, 0],  # last move c0
     },
 ]
 
