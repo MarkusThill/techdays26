@@ -38,7 +38,7 @@ def draw_board(
 ) -> None:
     """Draw a Connect-4 board state on a matplotlib Axes."""
     ax.set_xlim(-0.5, COLS - 0.5)
-    ax.set_ylim(-0.5, ROWS - 0.5)
+    ax.set_ylim(-0.85, ROWS - 0.5)
     ax.set_aspect("equal")
     ax.set_facecolor(C_BOARD_BG)
     ax.set_xticks([])

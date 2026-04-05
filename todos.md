@@ -11,14 +11,12 @@
 # Connect-4 Example
 ---
 - Let RL agent play against ChatGPT. Compare #weights against ChatGPT.
-- look for "afterstates" in suttons book!
 - compare to https://www.kaggle.com/code/auxeno/alphazero-connect-4-rl
 - keep track of the currently best model (weighted scores?).
 - N-Tuple systems. Sparsity: Compute exactly how many realizations are possible per LUT for a given n-tuple
 - Combine TD agent with shallow tree search
 - visualize n-tuples
 - Refactorings: Notebooks -> codebase
-- Try CNNs?
 - Unit Tests for refactored classes necessary.
 - Docstrings + ruff + mypy/pyrefly/ty linting
 - Investigate efficient way to implement eligibility traces (see Sutton & Barto)
