@@ -4,6 +4,10 @@
     - Maybe some example where off-policy would be faster if there is no random chance of falling in the lake
       but on-policy is better (keeping further from the holes) although it might require some Umweg!
 
+# Illustration Example
+---
+- Add a visualization of the tanh() and its deriv
+
 # Connect-4 Example
 ---
 - Let RL agent play against ChatGPT. Compare #weights against ChatGPT.

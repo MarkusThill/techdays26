@@ -146,6 +146,9 @@ class BitboardVisualizer:
         "all_tokens",
         "active_tokens",
         "opponent_tokens  (active_tokens ⊕ all_tokens)",
+        "BB_BOTTOM_ROW",
+        "all_tokens + BB_BOTTOM_ROW",
+        "BB_ALL_LEGAL",
         "legal_moves",
         "winning_positions  (current player)",
         "Bit Index Map",
@@ -523,6 +526,23 @@ class BitboardVisualizer:
             self._draw_bitboard_grid(out, opponent, "opponent_tokens", "#e67e22")
             return
 
+        if overlay == "BB_BOTTOM_ROW":
+            self._draw_bitboard_grid(out, BB_BOTTOM_ROW, "BB_BOTTOM_ROW", "#95a5a6")
+            return
+
+        if overlay == "all_tokens + BB_BOTTOM_ROW":
+            self._draw_bitboard_grid(
+                out,
+                all_tokens + BB_BOTTOM_ROW,
+                "all_tokens + BB_BOTTOM_ROW",
+                "#95a5a6",
+            )
+            return
+
+        if overlay == "BB_ALL_LEGAL":
+            self._draw_bitboard_grid(out, BB_ALL_LEGAL, "BB_ALL_LEGAL", "#95a5a6")
+            return
+
         if overlay == "legal_moves":
             legal = (all_tokens + BB_BOTTOM_ROW) & BB_ALL_LEGAL
             self._draw_bitboard_grid(
@@ -861,6 +881,26 @@ class BitboardVisualizer:
             The engine stores only <i>two</i> bitboards. The opponent's pieces are never stored explicitly —
             they fall out of XOR. After each move, <code>active_tokens ^= all_tokens</code> swaps
             perspective — no branching needed.
+        """,
+        "BB_BOTTOM_ROW": """
+            <b>BB_BOTTOM_ROW</b> — a constant with one bit set at row 0 of each column
+            (bits 0, 9, 18, 27, 36, 45, 54).<br>
+            Adding this to <code>all_tokens</code> triggers carry propagation within each column —
+            the carry climbs past all filled rows and lands on the first empty cell.
+            This is the seed of the legal-move computation.
+        """,
+        "all_tokens + BB_BOTTOM_ROW": """
+            <b>all_tokens + BB_BOTTOM_ROW</b> — the result of adding the bottom-row seed to the
+            current board.<br>
+            The carry propagates upward through each column's filled cells and lands on the
+            first empty row. Bits in the sentinel region (rows 6–8) appear for full columns —
+            these are stripped by the final AND with <code>BB_ALL_LEGAL</code>.
+        """,
+        "BB_ALL_LEGAL": """
+            <b>BB_ALL_LEGAL</b> — a constant mask covering all 42 playable cells
+            (rows 0–5 of each column).<br>
+            After the carry-propagation addition, AND-ing with this mask strips
+            the sentinel bits, leaving exactly the legal landing squares.
         """,
         "legal_moves": """
             <b>legal_moves</b> — computed as <code>(all_tokens + BB_BOTTOM_ROW) &amp; BB_ALL_LEGAL</code>.<br>
