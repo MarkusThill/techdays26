@@ -7,20 +7,19 @@
 # Illustration Example
 ---
 - Add a visualization of the tanh() and its deriv
+- Formula for number of states for n-tuples. Integrate into widget!
+- Let RL agent play against ChatGPT. Compare #weights against ChatGPT.
+- compare to https://www.kaggle.com/code/auxeno/alphazero-connect-4-rl
 
 # Connect-4 Example
 ---
-- Let RL agent play against ChatGPT. Compare #weights against ChatGPT.
-- compare to https://www.kaggle.com/code/auxeno/alphazero-connect-4-rl
 - keep track of the currently best model (weighted scores?).
 - N-Tuple systems. Sparsity: Compute exactly how many realizations are possible per LUT for a given n-tuple
 - Combine TD agent with shallow tree search
-- visualize n-tuples
 - Refactorings: Notebooks -> codebase
 - Unit Tests for refactored classes necessary.
 - Docstrings + ruff + mypy/pyrefly/ty linting
 - Investigate efficient way to implement eligibility traces (see Sutton & Barto)
-- look at the the non-zero updates
 - implement own update rule
 
 # BitBully TODOs:
