@@ -51,7 +51,7 @@ _PHASE_TITLES = [
     "Phase 1 — Evaluate Afterstates",
     "Phase 2 — Select Action (\u03b5-greedy)",
     "Phase 3 — Play the Move",
-    "Phase 4 — Compute TD Target",
+    "Phase 4 — Compute TD(0) Target",
     "Phase 5 — Weight Update",
     "Phase 6 — Next Half-Move",
 ]
@@ -397,12 +397,15 @@ class TDTrainingStepVisualizer:
                     f"No bootstrapping needed \u2014 we know the truth!"
                 )
             return (
-                f"The TD target is the model\u2019s value of the new state: "
+                f"The <b>TD(0) target</b> is the model\u2019s value of the new state: "
                 f"<b>target = V(s\u2032) = {self._td_target:+.3f}</b>. "
                 f"This is <i>bootstrapping</i> \u2014 the network teaches itself "
                 f"using its own future estimate. "
                 f"<b>TD error</b> = target \u2212 V(s) = "
-                f"<b>{self._td_error:+.3f}</b>."
+                f"<b>{self._td_error:+.3f}</b>. "
+                f"<span style='color:#7f8c8d'>(\u00a75.3\u20135.4 will replace this "
+                f"with a smarter <b>\u03bb-return</b> target that blends several "
+                f"future steps.)</span>"
             )
 
         elif phase == 5:
