@@ -1,4 +1,10 @@
+# General
+- Write General README file
+- Write Readme files for the labs lab1 & lab2
+
 # Frozen Lake Example
+- Align Lab 1 with Lab 2
+- Numbering of Sections
 - On-Policy vs. Off-Policy:
   On-Policy would avoid getting too close to lakes:
     - Maybe some example where off-policy would be faster if there is no random chance of falling in the lake
