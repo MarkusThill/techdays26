@@ -9,7 +9,7 @@ import pickle
 
 gym.register(
     id="FrozenLake-enhanced",
-    entry_point="frozen_lake_enhanced:FrozenLakeEnv",
+    entry_point="techdays26.frozen_lake.frozen_lake_enhanced:FrozenLakeEnv",
     kwargs={"map_name": "8x8"},
     max_episode_steps=200,
     reward_threshold=0.85,
