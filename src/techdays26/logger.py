@@ -41,6 +41,7 @@ class TrainingLogger:
         evaluate_fn: Callable[[Union[str, "NTupleNetwork"]], object],
         *,
         save_weights: bool = True,
+        save_snapshot_steps: list[int] | None = None,
     ) -> None:
         self._dir = repeat_dir
         self._n_eval = n_evaluate
@@ -49,6 +50,7 @@ class TrainingLogger:
         self._ri = repeat_idx
         self._eval_fn = evaluate_fn
         self._save_weights = save_weights
+        self._snapshot_steps = set(save_snapshot_steps or [])
 
         self._metrics_path = repeat_dir / "0_metrics.json"
         self._arena_path = repeat_dir / "0_arena_metrics.json"
@@ -158,6 +160,14 @@ class TrainingLogger:
                     f"  grad_nnz={m['grad_nnz']}  done={m['done_frac']:.2f}  "
                     f"rand={m['randomize_frac']:.2f}\n{sep}\n\n"
                 )
+
+        # ── Save model snapshot at user-specified steps ──────────────────
+        if step in self._snapshot_steps:
+            snap = copy.deepcopy(net).cpu()
+            snap.eval()
+            snap_path = self._dir / f"step_{step}_snapshot.pt"
+            snap.save(str(snap_path))
+            print(f"{pfx}snapshot saved → {snap_path}")
 
         # ── Arena evaluation every n_evaluate steps ───────────────────────
         if step % self._n_eval == 0:
