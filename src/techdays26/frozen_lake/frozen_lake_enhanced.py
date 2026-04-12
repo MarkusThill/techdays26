@@ -424,13 +424,24 @@ class FrozenLakeEnv(Env):
             pygame.init()
             self.pygame_initialized = True
 
+            # --- choose font sizes depending on render mode ---
+            if mode == "human":
+                ui_font_size = 25
+                q_font_size = 20
+                v_font_size = 22
+            else:  # mode == "rgb_array"
+                ui_font_size = 16
+                q_font_size = 14
+                v_font_size = 14
+            # ---------------------------------------------------
+
             # fonts for UI
-            self.ui_font = pygame.font.SysFont("Courier", 25)
-            self.ui_font_bold = pygame.font.SysFont("Courier", 25, True)
-            self.q_font = pygame.font.SysFont("Courier", 20)
-            self.q_font_bold = pygame.font.SysFont("Courier", 20, True)
-            self.v_font = pygame.font.SysFont("Courier", 22)  # <<< NEW
-            self.v_font_bold = pygame.font.SysFont("Courier", 22, True)  # <<< NEW
+            self.ui_font = pygame.font.SysFont("Courier", ui_font_size)
+            self.ui_font_bold = pygame.font.SysFont("Courier", ui_font_size, True)
+            self.q_font = pygame.font.SysFont("Courier", q_font_size)
+            self.q_font_bold = pygame.font.SysFont("Courier", q_font_size, True)
+            self.v_font = pygame.font.SysFont("Courier", v_font_size)
+            self.v_font_bold = pygame.font.SysFont("Courier", v_font_size, True)
 
             if mode == "human":
                 pygame.display.init()
