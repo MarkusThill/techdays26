@@ -65,7 +65,12 @@ class LambdaReturnVisualizer:
         self._out.clear_output(wait=True)
         with self._out:
             fig_w = min(0.7 * k + 3, 14)
-            fig, ax = plt.subplots(figsize=(fig_w, 3.2))
+            fig, (ax_stack, ax) = plt.subplots(
+                1,
+                2,
+                figsize=(fig_w + 1.2, 3.2),
+                gridspec_kw={"width_ratios": [1, max(k, 4)], "wspace": 0.3},
+            )
             fig.patch.set_facecolor("#f8f9fa")
 
             x = np.arange(1, k + 1)
@@ -102,6 +107,39 @@ class LambdaReturnVisualizer:
                 fontsize=8,
                 loc="upper right",
             )
+
+            # ── Stacked bar on the left: weights sum to 1 ──
+            bottom = 0.0
+            for i, w in enumerate(weights):
+                ax_stack.bar(
+                    0,
+                    w,
+                    bottom=bottom,
+                    color=colors[i],
+                    edgecolor="white",
+                    width=0.5,
+                )
+                if w > 0.04:
+                    ax_stack.text(
+                        0,
+                        bottom + w / 2,
+                        f"{w:.3f}",
+                        ha="center",
+                        va="center",
+                        fontsize=6,
+                        color="white",
+                        fontweight="bold",
+                    )
+                bottom += w
+            ax_stack.set_ylim(0, 1.08)
+            ax_stack.set_xlim(-0.6, 0.6)
+            ax_stack.set_xticks([])
+            ax_stack.set_ylabel("Cumulative weight")
+            ax_stack.set_title("$\\Sigma = 1$", fontsize=10, fontweight="bold")
+            ax_stack.axhline(1.0, color="#2c3e50", ls="--", lw=0.8, zorder=3)
+            ax_stack.spines["top"].set_visible(False)
+            ax_stack.spines["right"].set_visible(False)
+
             plt.tight_layout()
             plt.show()
 

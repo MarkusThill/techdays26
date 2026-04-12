@@ -76,7 +76,12 @@ class LambdaDecayVisualizer:
 
         self._out.clear_output(wait=True)
         with self._out:
-            fig, ax = plt.subplots(figsize=(10, 4.5))
+            fig, (ax_stack, ax) = plt.subplots(
+                1,
+                2,
+                figsize=(11.5, 4.5),
+                gridspec_kw={"width_ratios": [1, max(horizon, 5)], "wspace": 0.25},
+            )
             fig.patch.set_facecolor("#f8f9fa")
 
             # ── Draw the continuous decay envelope ──
@@ -167,22 +172,7 @@ class LambdaDecayVisualizer:
                 fontweight="bold",
             )
 
-            # ── Annotation: total area = 1 ──
-            ax.text(
-                t + (T - t) * 0.35,
-                max(first_w, terminal_w) + 0.22,
-                "total area = 1",
-                fontsize=11,
-                ha="center",
-                color="#2c3e50",
-                fontweight="bold",
-                bbox=dict(
-                    boxstyle="round,pad=0.3",
-                    facecolor="#fff3cd",
-                    edgecolor="#ffc107",
-                    alpha=0.9,
-                ),
-            )
+            # (the stacked bar on the left now shows Σ = 1)
 
             # ── Annotation: example bar ──
             if horizon > 3:
@@ -251,6 +241,44 @@ class LambdaDecayVisualizer:
                 fontsize=12,
                 fontweight="bold",
             )
+
+            # ── Stacked bar on the left: weights sum to 1 ──
+            bar_weights = [(1 - lam) * lam ** (n - 1) for n in range(1, horizon)]
+            bar_colors = ["#3498db"] * len(bar_weights)
+            bar_weights.append(terminal_w)
+            bar_colors.append("#e74c3c")
+
+            bottom = 0.0
+            for bw, bc in zip(bar_weights, bar_colors):
+                ax_stack.bar(
+                    0,
+                    bw,
+                    bottom=bottom,
+                    color=bc,
+                    alpha=0.6,
+                    edgecolor="white",
+                    width=0.5,
+                )
+                if bw > 0.04:
+                    ax_stack.text(
+                        0,
+                        bottom + bw / 2,
+                        f"{bw:.3f}",
+                        ha="center",
+                        va="center",
+                        fontsize=6,
+                        color="white",
+                        fontweight="bold",
+                    )
+                bottom += bw
+            ax_stack.set_ylim(0, 1.08)
+            ax_stack.set_xlim(-0.6, 0.6)
+            ax_stack.set_xticks([])
+            ax_stack.set_ylabel("Cumulative weight")
+            ax_stack.set_title("$\\Sigma = 1$", fontsize=10, fontweight="bold")
+            ax_stack.axhline(1.0, color="#2c3e50", ls="--", lw=0.8, zorder=3)
+            ax_stack.spines["top"].set_visible(False)
+            ax_stack.spines["right"].set_visible(False)
 
             plt.tight_layout()
             plt.show()
