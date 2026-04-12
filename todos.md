@@ -16,10 +16,7 @@
 
 # Illustration Example
 ---
-- Show the stacked weights have a sum=1
-- Allow to save snapshots at certain number of steps!
 - Add a visualization of the tanh() and its deriv
-- Formula for number of states for n-tuples. Integrate into widget!
 - Let RL agent play against ChatGPT. Compare #weights against ChatGPT.
 - compare to https://www.kaggle.com/code/auxeno/alphazero-connect-4-rl
 
