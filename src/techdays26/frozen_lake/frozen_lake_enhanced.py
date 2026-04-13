@@ -254,19 +254,8 @@ class FrozenLakeEnv(Env):
         def to_s(row, col):
             return row * ncol + col
 
-        def inc(row, col, a):
-            if a == LEFT:
-                col = max(col - 1, 0)
-            elif a == DOWN:
-                row = min(row + 1, nrow - 1)
-            elif a == RIGHT:
-                col = min(col + 1, ncol - 1)
-            elif a == UP:
-                row = max(row - 1, 0)
-            return (row, col)
-
         def update_probability_matrix(row, col, action):
-            new_row, new_col = inc(row, col, action)
+            new_row, new_col = self._inc(row, col, action)
             new_state = to_s(new_row, new_col)
             new_letter = desc[new_row, new_col]
             terminated = bytes(new_letter) in b"GH"
@@ -324,13 +313,39 @@ class FrozenLakeEnv(Env):
             False  # flag to determine if pygame has been initialized
         )
         self.text_padding = 5
+        self.slipped = False
+        self.orig_state = None  # NEW: state before last action
+        self.intended_state = None  # NEW: where we wanted to go
+
+    def _inc(self, row, col, a):
+        if a == LEFT:
+            col = max(col - 1, 0)
+        elif a == DOWN:
+            row = min(row + 1, self.nrow - 1)
+        elif a == RIGHT:
+            col = min(col + 1, self.ncol - 1)
+        elif a == UP:
+            row = max(row - 1, 0)
+        return (row, col)
 
     def step(self, a):
         transitions = self.P[self.s][a]
         i = categorical_sample([t[0] for t in transitions], self.np_random)
         p, s, r, t = transitions[i]
+
+        # remember original state BEFORE the move
+        self.orig_state = self.s
+
+        # compute intended state from original state and action (no slip)
+        orig_row, orig_col = self.orig_state // self.ncol, self.orig_state % self.ncol
+        intended_row, intended_col = self._inc(orig_row, orig_col, a)
+        self.intended_state = intended_row * self.ncol + intended_col
+
         self.s = s
         self.lastaction = a
+
+        # detect slip: only meaningful when there are multiple possible outcomes
+        self.slipped = len(transitions) > 1 and i != 1
 
         if self.pygame_initialized:
             # Process user events, key presses
@@ -392,6 +407,11 @@ class FrozenLakeEnv(Env):
         super().reset(seed=seed)
         self.s = categorical_sample(self.initial_state_distrib, self.np_random)
         self.lastaction = None
+
+        # clear slip info
+        self.slipped = False
+        self.orig_state = None
+        self.intended_state = None
 
         if self.render_mode == "human":
             self.render()
@@ -648,6 +668,81 @@ class FrozenLakeEnv(Env):
         else:
             self.window_surface.blit(elf_img, elf_offset)
 
+        # --- draw arrows when we have a previous state and a slip happened ---
+        if (
+            self.slipped
+            and self.orig_state is not None
+            and self.intended_state is not None
+            and self.orig_state != self.s
+        ):
+            # common: original state center
+            o_row, o_col = divmod(self.orig_state, self.ncol)
+            o_x = o_col * self.cell_size[0] + self.cell_size[0] // 2
+            o_y = o_row * self.cell_size[1] + self.cell_size[1] // 2
+
+            # 1) RED arrow: original -> actual new state (self.s)
+            a_row, a_col = divmod(self.s, self.ncol)
+            a_x = a_col * self.cell_size[0] + self.cell_size[0] // 2
+            a_y = a_row * self.cell_size[1] + self.cell_size[1] // 2
+
+            pygame.draw.line(
+                self.window_surface,
+                (200, 10, 10),  # red
+                (o_x, o_y),
+                (a_x, a_y),
+                3,
+            )
+
+            dx = a_x - o_x
+            dy = a_y - o_y
+            length = max((dx**2 + dy**2) ** 0.5, 1)
+            ux, uy = dx / length, dy / length
+            perp_x, perp_y = -uy, ux
+            head_len = 10
+            head_width = 5
+
+            tip = (a_x, a_y)
+            left = (
+                a_x - head_len * ux + head_width * perp_x,
+                a_y - head_len * uy + head_width * perp_y,
+            )
+            right = (
+                a_x - head_len * ux - head_width * perp_x,
+                a_y - head_len * uy - head_width * perp_y,
+            )
+            pygame.draw.polygon(self.window_surface, (200, 10, 10), [tip, left, right])
+
+            # 2) BLUE arrow: original -> intended state (no slip)
+            i_row, i_col = divmod(self.intended_state, self.ncol)
+            i_x = i_col * self.cell_size[0] + self.cell_size[0] // 2
+            i_y = i_row * self.cell_size[1] + self.cell_size[1] // 2
+
+            pygame.draw.line(
+                self.window_surface,
+                (0, 0, 200),  # blue
+                (o_x, o_y),
+                (i_x, i_y),
+                2,
+            )
+
+            dx = i_x - o_x
+            dy = i_y - o_y
+            length = max((dx**2 + dy**2) ** 0.5, 1)
+            ux, uy = dx / length, dy / length
+            perp_x, perp_y = -uy, ux
+
+            tip = (i_x, i_y)
+            left = (
+                i_x - head_len * ux + head_width * perp_x,
+                i_y - head_len * uy + head_width * perp_y,
+            )
+            right = (
+                i_x - head_len * ux - head_width * perp_x,
+                i_y - head_len * uy - head_width * perp_y,
+            )
+            pygame.draw.polygon(self.window_surface, (0, 0, 200), [tip, left, right])
+        # ---------------------------------------------------------------------
+
         if mode == "human":
             # render actual FPS
             text_img = self.ui_font.render(
@@ -721,7 +816,7 @@ class FrozenLakeEnv(Env):
 
             # Blink the elf when reaching the goal
             if desc[bot_row][bot_col] == b"G":
-                for blink in range(6):
+                for blink in range(3):
                     pygame.time.wait(150)
                     if blink % 2 == 0:
                         # hide elf: redraw goal tile
