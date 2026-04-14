@@ -773,6 +773,10 @@ class FrozenLakeEnv(Env):
                 "Window closes when training completes",
                 "P : Pause / Resume",
                 " ",
+                "Legend:",
+                "Red arrow: actual move",
+                "Blue arrow: intended move",
+                " ",
                 "ESC to Quit",
                 "Training progress is lost",
             ]
