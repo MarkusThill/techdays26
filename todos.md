@@ -3,16 +3,7 @@
 - Write Readme files for the labs lab1 & lab2
 
 # Frozen Lake Example
-1. add slippery
-2. add Q-Functions -> Reasoning when they are preferable over V(s)
-3. Train an agent Q(s,a) from scratch (Watkins Q-Learning or SARSA?)
 - Align Lab 1 with Lab 2
-- save the trained value functions
-- what about the slippery environment?
-- On-Policy vs. Off-Policy:
-  On-Policy would avoid getting too close to lakes:
-    - Maybe some example where off-policy would be faster if there is no random chance of falling in the lake
-      but on-policy is better (keeping further from the holes) although it might require some Umweg!
 
 # Illustration Example
 ---
