@@ -2,8 +2,6 @@
 
 Learn the basics of **Reinforcement Learning (RL)** and train your own RL agents through two hands-on labs. No prior AI experience required — just a laptop and basic Python.
 
-> 🚧 *Heavily under construction.*
-
 ---
 
 ## 🗺️ Workshop Journey
