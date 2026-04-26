@@ -29,6 +29,11 @@ class TrainingLogger:
                       evaluation step and pass the file path to evaluate_fn.
                       If False, pass a deep-copied CPU snapshot of the network
                       directly — no disk I/O.
+        save_detailed_arena_results: If True (default), write the full per-step
+                      ``step_<N>_arena_result.json`` files containing complete
+                      per-game match details. The aggregated scores in
+                      ``0_arena_metrics.json`` (used by ``2_plot_metrics.ipynb``)
+                      are always written regardless of this flag.
     """
 
     def __init__(
@@ -42,6 +47,7 @@ class TrainingLogger:
         *,
         save_weights: bool = True,
         save_snapshot_steps: list[int] | None = None,
+        save_detailed_arena_results: bool = True,
     ) -> None:
         self._dir = repeat_dir
         self._n_eval = n_evaluate
@@ -51,6 +57,7 @@ class TrainingLogger:
         self._eval_fn = evaluate_fn
         self._save_weights = save_weights
         self._snapshot_steps = set(save_snapshot_steps or [])
+        self._save_detailed_arena_results = save_detailed_arena_results
 
         self._metrics_path = repeat_dir / "0_metrics.json"
         self._arena_path = repeat_dir / "0_arena_metrics.json"
@@ -184,7 +191,8 @@ class TrainingLogger:
                 eval_arg = net_snapshot
             result = self._eval_fn(eval_arg)
 
-            result.save_json(str(self._dir / f"step_{step}_arena_result.json"))
+            if self._save_detailed_arena_results:
+                result.save_json(str(self._dir / f"step_{step}_arena_result.json"))
             self._all_arena.append({
                 "step": step,
                 "training_elapsed_s": time.time() - self._t0,
