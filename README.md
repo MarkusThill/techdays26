@@ -10,8 +10,7 @@ This repository contains both:
 ---
 
 ## 🗺️ Workshop Journey
-
-<video src="artifacts/frozen_lake_elf.mp4" controls width="700"></video>
+![Demo](artifacts/frozen_lake_elf.gif)
 
 The workshop consists of **two labs** that build on each other. Work through them in order.
 
