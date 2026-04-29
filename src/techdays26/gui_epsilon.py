@@ -12,20 +12,16 @@ from __future__ import annotations
 
 import random as pyrandom
 
-import torch
 import matplotlib.pyplot as plt
-import numpy as np
+import torch
 from IPython.display import display
-from ipywidgets import Button, FloatSlider, HBox, VBox, Output, Layout, HTML
+from ipywidgets import HTML, Button, FloatSlider, HBox, Layout, Output, VBox
 
 from techdays26.gui_common import (
-    draw_board,
-    snap,
-    legal_columns,
     COLS,
-    COL_STRIDE,
-    C_YELLOW,
-    C_RED,
+    draw_board,
+    legal_columns,
+    snap,
 )
 from techdays26.ntuple_network import NTupleNetwork
 from techdays26.torch_board import BoardBatch

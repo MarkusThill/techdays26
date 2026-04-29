@@ -2,8 +2,7 @@ import pygame
 
 
 def get_action_from_keyboard(key_to_action):
-    """
-    Waits for keyboard input and returns the corresponding action.
+    """Waits for keyboard input and returns the corresponding action.
     Returns None if the window should be closed.
     """
     while True:

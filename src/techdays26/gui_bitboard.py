@@ -21,33 +21,23 @@ Usage::
 from __future__ import annotations
 
 import importlib.resources
-import textwrap
-from collections.abc import Sequence
 from pathlib import Path
 
-import matplotlib
-import matplotlib.colors as mcolors
 import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
 import numpy as np
+from bitbully import Board
 from IPython.display import display
-
 from ipywidgets import (
     HTML,
-    AppLayout,
     Button,
     Dropdown,
     HBox,
-    Label,
     Layout,
     Output,
     Text,
-    ToggleButton,
-    ToggleButtons,
     VBox,
 )
-
-from bitbully import Board
 
 # ──────────────────────────────────────────────────────────────────────
 # Constants matching the C++ engine
@@ -65,8 +55,7 @@ for c in range(N_COLS):
 # Sentinel mask: bits that are not part of the playable 6×7 area
 SENTINEL_BITS = set()
 for c in range(N_COLS):
-    for r in range(N_ROWS, N_ROWS + 3):
-        SENTINEL_BITS.add(c * COL_BIT_OFFSET + r)
+    SENTINEL_BITS.update(c * COL_BIT_OFFSET + r for r in range(N_ROWS, N_ROWS + 3))
 # Also bit 63 (unused)
 SENTINEL_BITS.add(63)
 

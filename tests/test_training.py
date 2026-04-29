@@ -2,11 +2,10 @@
 
 from __future__ import annotations
 
-import os
+import pathlib
 import tempfile
 
 import bitbully.bitbully_core as bbc
-import pytest
 import torch
 
 from techdays26.ntuple_network import NTupleNetwork
@@ -128,7 +127,7 @@ def test_ntuple_network_save_load_roundtrip():
             v_after = net2(board)
         assert torch.equal(v_before, v_after), "Forward pass differs after save/load"
     finally:
-        os.remove(path)
+        pathlib.Path(path).unlink()
 
 
 def test_ntuple_network_gradient_flow():

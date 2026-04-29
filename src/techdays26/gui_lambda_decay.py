@@ -10,8 +10,8 @@ Usage::
 
 from __future__ import annotations
 
-import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
+import matplotlib.pyplot as plt
 import numpy as np
 from IPython.display import display
 from ipywidgets import HTML, FloatSlider, IntSlider, Layout, Output, VBox

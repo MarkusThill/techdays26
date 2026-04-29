@@ -10,12 +10,12 @@ Usage::
 
 from __future__ import annotations
 
-import torch
 import matplotlib.pyplot as plt
+import torch
 from IPython.display import display
-from ipywidgets import Button, HBox, VBox, Output, Layout, HTML
+from ipywidgets import HTML, Button, HBox, Output, VBox
 
-from techdays26.gui_common import draw_board, snap, random_legal_col, COLS
+from techdays26.gui_common import draw_board, random_legal_col, snap
 from techdays26.torch_board import BoardBatch
 
 

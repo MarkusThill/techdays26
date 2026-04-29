@@ -14,10 +14,10 @@ Usage::
 
 from __future__ import annotations
 
-import torch
 import matplotlib.pyplot as plt
+import torch
 from IPython.display import display
-from ipywidgets import Dropdown, VBox, Output, Layout, HTML
+from ipywidgets import HTML, Dropdown, Layout, Output, VBox
 
 from techdays26.gui_common import draw_board
 from techdays26.torch_board import BoardBatch

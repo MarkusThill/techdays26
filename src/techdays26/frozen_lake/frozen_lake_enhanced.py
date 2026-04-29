@@ -4,17 +4,14 @@
 from contextlib import closing
 from io import StringIO
 from os import path
-from typing import List, Optional
-
-import numpy as np
 
 import gymnasium as gym
+import numpy as np
+import pygame
 from gymnasium import Env, spaces, utils
 from gymnasium.envs.toy_text.utils import categorical_sample
 from gymnasium.error import DependencyNotInstalled
 from gymnasium.utils import seeding
-
-import pygame
 
 LEFT = 0
 DOWN = 1
@@ -37,12 +34,12 @@ MAPS = {
 
 
 # DFS to check that it's a valid path.
-def is_valid(board: List[List[str]], max_size: int) -> bool:
+def is_valid(board: list[list[str]], max_size: int) -> bool:
     frontier, discovered = [], set()
     frontier.append((0, 0))
     while frontier:
         r, c = frontier.pop()
-        if not (r, c) in discovered:
+        if (r, c) not in discovered:
             discovered.add((r, c))
             directions = [(1, 0), (0, 1), (-1, 0), (0, -1)]
             for x, y in directions:
@@ -58,8 +55,8 @@ def is_valid(board: List[List[str]], max_size: int) -> bool:
 
 
 def generate_random_map(
-    size: int = 8, p: float = 0.8, seed: Optional[int] = None
-) -> List[str]:
+    size: int = 8, p: float = 0.8, seed: int | None = None
+) -> list[str]:
     """Generates a random valid map (one that has a path from start to goal)
 
     Args:
@@ -85,8 +82,7 @@ def generate_random_map(
 
 
 class FrozenLakeEnv(Env):
-    """
-    Frozen lake involves crossing a frozen lake from start to goal without falling into any holes
+    """Frozen lake involves crossing a frozen lake from start to goal without falling into any holes
     by walking over the frozen lake.
     The player may not always move in the intended direction due to the slippery nature of the frozen lake.
 
@@ -222,7 +218,7 @@ class FrozenLakeEnv(Env):
 
     def __init__(
         self,
-        render_mode: Optional[str] = None,
+        render_mode: str | None = None,
         desc=None,
         *,
         map_name="4x4",
@@ -386,10 +382,7 @@ class FrozenLakeEnv(Env):
                                 elif (
                                     ev.type == pygame.KEYDOWN
                                     and ev.key == pygame.K_ESCAPE
-                                ):
-                                    pygame.quit()
-                                    sys.exit()
-                                elif ev.type == pygame.QUIT:
+                                ) or ev.type == pygame.QUIT:
                                     pygame.quit()
                                     sys.exit()
                             pygame.time.wait(50)
@@ -401,8 +394,8 @@ class FrozenLakeEnv(Env):
     def reset(
         self,
         *,
-        seed: Optional[int] = None,
-        options: Optional[dict] = None,
+        seed: int | None = None,
+        options: dict | None = None,
     ):
         super().reset(seed=seed)
         self.s = categorical_sample(self.initial_state_distrib, self.np_random)
@@ -425,12 +418,12 @@ class FrozenLakeEnv(Env):
                 "You can specify the render_mode at initialization, "
                 f'e.g. gym.make("{self.spec.id}", render_mode="rgb_array")'
             )
-            return
+            return None
 
         if self.render_mode == "ansi":
             return self._render_text()
-        else:  # self.render_mode in {"human", "rgb_array"}:
-            return self._render_gui(self.render_mode)
+        # self.render_mode in {"human", "rgb_array"}:
+        return self._render_gui(self.render_mode)
 
     def _render_gui(self, mode):
         try:
@@ -571,7 +564,7 @@ class FrozenLakeEnv(Env):
                     # Loop thru the 4 Q values for the current state
                     for i in range(4):
                         # Format q for display
-                        q = "{:.2f}".format(self.q_table[state][i]).lstrip("0")
+                        q = f"{self.q_table[state][i]:.2f}".lstrip("0")
 
                         # Color: -1 = bright red, 0 = black, +1 = bright blue
                         val = max(-1.0, min(1.0, self.q_table[state][i]))
@@ -631,7 +624,7 @@ class FrozenLakeEnv(Env):
                     v = float(self.v_table[state])
 
                     # Format for display
-                    v_str = "{:.2f}".format(v).lstrip("0")
+                    v_str = f"{v:.2f}".lstrip("0")
 
                     # Color: -1 = bright red, 0 = black, +1 = bright blue
                     val = max(-1.0, min(1.0, v))
@@ -878,8 +871,7 @@ class FrozenLakeEnv(Env):
         self.q_table = q_table
 
     def set_v(self, v_table):
-        """
-        Set the state-value function V(s).
+        """Set the state-value function V(s).
 
         v_table should be a 1D array-like of length nS (nrow * ncol),
         where index s = row * ncol + col.

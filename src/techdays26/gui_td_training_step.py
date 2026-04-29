@@ -22,26 +22,26 @@ from __future__ import annotations
 import math
 import random as pyrandom
 
-import torch
-import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
+import matplotlib.pyplot as plt
 import numpy as np
+import torch
 from IPython.display import display
 from ipywidgets import (
+    HTML,
     Button,
     FloatSlider,
     HBox,
-    VBox,
-    Output,
     Layout,
-    HTML,
+    Output,
+    VBox,
 )
 
 from techdays26.gui_common import (
-    draw_board,
-    snap,
-    legal_columns,
     COLS,
+    draw_board,
+    legal_columns,
+    snap,
 )
 from techdays26.ntuple_network import NTupleNetwork
 from techdays26.torch_board import BoardBatch
@@ -341,7 +341,7 @@ class TDTrainingStepVisualizer:
                 f"Positive = good for Yellow, negative = good for Red."
             )
 
-        elif phase == 1:
+        if phase == 1:
             n = len(self._move_evals)
             if not self._move_evals:
                 return "No legal moves available."
@@ -359,7 +359,7 @@ class TDTrainingStepVisualizer:
                 f"with V = <b>{best[1]:+.3f}</b>."
             )
 
-        elif phase == 2:
+        if phase == 2:
             eps = self._sl_eps.value
             if self._explored:
                 return (
@@ -375,7 +375,7 @@ class TDTrainingStepVisualizer:
                 f"and picks the best column: <b>{self._chosen_col}</b>."
             )
 
-        elif phase == 3:
+        if phase == 3:
             ml_after = self._s_after_snap[2]
             next_player = self._player_to_move(ml_after)
             next_color = "#f1c40f" if next_player == "Yellow" else "#e74c3c"
@@ -387,7 +387,7 @@ class TDTrainingStepVisualizer:
                 f"<i>their</i> training step.)"
             )
 
-        elif phase == 4:
+        if phase == 4:
             if self._terminal:
                 outcome_map = {1.0: "Yellow wins!", -1.0: "Red wins!", 0.0: "Draw!"}
                 outcome = outcome_map.get(self._terminal_reward, "?")
@@ -408,7 +408,7 @@ class TDTrainingStepVisualizer:
                 f"future steps.)</span>"
             )
 
-        elif phase == 5:
+        if phase == 5:
             loss = self._td_error**2
             direction = "up" if self._td_error > 0 else "down"
             return (
@@ -420,7 +420,7 @@ class TDTrainingStepVisualizer:
                 f"\u2014 no need to wait for the game to end!"
             )
 
-        elif phase == 6:
+        if phase == 6:
             n = len(self._history)
             ml_after = self._s_after_snap[2]
             next_player = self._player_to_move(ml_after)

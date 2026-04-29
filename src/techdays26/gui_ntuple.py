@@ -22,8 +22,8 @@ from typing import NamedTuple
 import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
 import numpy as np
+from bitbully import Board
 from IPython.display import display
-
 from ipywidgets import (
     HTML,
     Button,
@@ -36,8 +36,6 @@ from ipywidgets import (
     ToggleButton,
     VBox,
 )
-
-from bitbully import Board
 
 # ── Constants ─────────────────────────────────────────────────────────────────
 N_COLS = 7
@@ -336,8 +334,8 @@ class NTupleVisualizer:
     def _load_pt_model(self, path: str) -> None:
         """Load a .pt NTupleNetwork and convert to TwoPlayerWeights."""
         from techdays26.legacy_ntuple_agent import (
-            TupleLUT,
             PlayerWeights,
+            TupleLUT,
             TwoPlayerWeights,
         )
         from techdays26.ntuple_network import NTupleNetwork

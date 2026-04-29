@@ -17,6 +17,7 @@ You can drop this module into your project and adapt naming/paths as needed.
 """
 
 from __future__ import annotations
+
 import hashlib
 import json
 import logging

@@ -16,13 +16,12 @@ from __future__ import annotations
 
 import math
 
-import torch
 import matplotlib.pyplot as plt
-import numpy as np
+import torch
 from IPython.display import display
-from ipywidgets import Button, HBox, VBox, Output, Layout, HTML
+from ipywidgets import HTML, Button, HBox, Output, VBox
 
-from techdays26.gui_common import draw_board, COLS, COL_STRIDE
+from techdays26.gui_common import COL_STRIDE, COLS, draw_board
 from techdays26.torch_board import BoardBatch
 
 

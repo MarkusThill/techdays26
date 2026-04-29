@@ -3,8 +3,9 @@ from __future__ import annotations
 import copy
 import json
 import time
+from collections.abc import Callable
 from pathlib import Path
-from typing import TYPE_CHECKING, Callable, Union
+from typing import TYPE_CHECKING
 
 import torch
 
@@ -43,7 +44,7 @@ class TrainingLogger:
         n_truncate: int,
         n_repeats: int,
         repeat_idx: int,
-        evaluate_fn: Callable[[Union[str, "NTupleNetwork"]], object],
+        evaluate_fn: Callable[[str | NTupleNetwork], object],
         *,
         save_weights: bool = True,
         save_snapshot_steps: list[int] | None = None,
@@ -98,7 +99,7 @@ class TrainingLogger:
         randomize: torch.Tensor,
         update_mask: torch.Tensor,
         V_pred: torch.Tensor,
-        board: "BoardBatch",
+        board: BoardBatch,
     ) -> None:
         pfx = f"[R{self._ri}] " if self._n_repeats > 1 else ""
 
@@ -186,7 +187,7 @@ class TrainingLogger:
             if self._save_weights:
                 weights_path = str(self._dir / f"step_{step}_model_weights.pt")
                 net_snapshot.save(weights_path)
-                eval_arg: Union[str, "NTupleNetwork"] = weights_path
+                eval_arg: str | NTupleNetwork = weights_path
             else:
                 eval_arg = net_snapshot
             result = self._eval_fn(eval_arg)

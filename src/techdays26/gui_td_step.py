@@ -11,25 +11,23 @@ Usage::
 from __future__ import annotations
 
 import math
-import random as pyrandom
 
-import torch
-import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
-import numpy as np
+import matplotlib.pyplot as plt
+import torch
 from IPython.display import display
 from ipywidgets import (
+    HTML,
     Button,
     FloatSlider,
-    IntSlider,
     HBox,
-    VBox,
-    Output,
+    IntSlider,
     Layout,
-    HTML,
+    Output,
+    VBox,
 )
 
-from techdays26.gui_common import draw_board, COLS, COL_STRIDE
+from techdays26.gui_common import COL_STRIDE, COLS, draw_board
 from techdays26.ntuple_network import NTupleNetwork
 from techdays26.torch_board import BoardBatch
 

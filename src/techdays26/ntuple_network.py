@@ -21,7 +21,7 @@ class NTupleNetwork(nn.Module):
         # 0 = Yellow, 1 = Red
         self.W = nn.Parameter(torch.zeros(2, self.M, self.K))
 
-    def forward(self, board: "BoardBatch") -> torch.Tensor:
+    def forward(self, board: BoardBatch) -> torch.Tensor:
         """Returns [B] tensor in [-1, 1]."""
         # [B, M] table indices
         T = board.table_positions(self.n_tuple_tensor)

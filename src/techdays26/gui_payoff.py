@@ -31,13 +31,12 @@ from techdays26.ntuple_network import NTupleNetwork
 from techdays26.ntuples import NTUPLE_BITIDX_LIST_200
 from techdays26.torch_board import BoardBatch
 
-
 # ─── Checkpoint progress plot ────────────────────────────────────────
 
 
 def _read_arena(path: Path) -> dict[str, Counter]:
     """Tally W/D/L per matchup from one arena_result.json (ntuple POV)."""
-    with open(path) as f:
+    with Path(path).open() as f:
         d = json.load(f)
     tally: dict[str, Counter] = {}
     for g in d["result"]["games"]:
@@ -96,8 +95,7 @@ def plot_checkpoint_progress(run_dir: str) -> None:
     # Aggregate per opponent, combining yellow+red sides:
     opponents: set[str] = set()
     for t in arena.values():
-        for key in t:
-            opponents.add(key.split(":")[0])
+        opponents.update(key.split(":")[0] for key in t)
 
     def winrate(step: int, opp: str) -> float | None:
         t = arena.get(step, {})
@@ -179,8 +177,6 @@ def plot_checkpoint_progress(run_dir: str) -> None:
 # ─── NTuple-as-Connect4Agent wrapper for rematch ─────────────────────
 
 try:
-    from bitbully import Board as _BBBoard  # type: ignore
-
     _BITBULLY_OK = True
 except Exception:
     _BITBULLY_OK = False

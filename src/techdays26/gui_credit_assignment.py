@@ -15,15 +15,14 @@ of the game becomes a learning signal for *every* move that led up to it.
 
 from __future__ import annotations
 
-import math
 import random as pyrandom
 
-import torch
 import matplotlib.pyplot as plt
+import torch
 from IPython.display import display
-from ipywidgets import Button, HBox, VBox, Output, HTML, IntSlider, Layout
+from ipywidgets import HTML, Button, HBox, Layout, Output, VBox
 
-from techdays26.gui_common import draw_board, COLS, COL_STRIDE
+from techdays26.gui_common import COL_STRIDE, COLS, draw_board
 from techdays26.ntuple_network import NTupleNetwork
 from techdays26.torch_board import BoardBatch
 
