@@ -10,6 +10,7 @@ This repository contains both:
 ---
 
 ## 🗺️ Workshop Journey
+<video src="https://github.com/user-attachments/assets/24683e9f-f7ba-4653-ba21-3566bd409dc4" width="352" height="720"></video>
 
 The workshop consists of **two labs** that build on each other. Work through them in order.
 
