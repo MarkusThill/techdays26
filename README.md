@@ -11,18 +11,28 @@ This repository contains both:
 
 ## 🗺️ Workshop Journey
 <!--https://github.com/orgs/community/discussions/19403--->
-<div style="display: flex; flex-direction: row; gap: 16px; justify-content: center;">
-  <video
-    src="https://github.com/user-attachments/assets/24683e9f-f7ba-4653-ba21-3566bd409dc4"
-    width="352"
-    height="720"
-  ></video>
-  <video
-    src="https://github.com/user-attachments/assets/3786851d-a7de-42b5-8453-a327b1cef197"
-    width="352"
-    height="720"
-  ></video>
-</div>
+
+<table>
+ <tr>
+ <td>
+ <video
+ src="https://github.com/user-attachments/assets/24683e9f-f7ba-4653-ba21-3566bd409dc4"
+ controls
+ width="400"
+ >
+ </video>
+ </td>
+ <td>
+ <video
+ src="https://github.com/user-attachments/assets/3786851d-a7de-42b5-8453-a327b1cef197"
+ controls
+ width="400"
+ >
+ </video>
+ </td>
+ </tr>
+</table>
+
 
 
 
