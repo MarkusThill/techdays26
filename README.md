@@ -11,7 +11,22 @@ This repository contains both:
 
 ## 🗺️ Workshop Journey
 <!--https://github.com/orgs/community/discussions/19403--->
-<video src="https://github.com/user-attachments/assets/24683e9f-f7ba-4653-ba21-3566bd409dc4" width="352" height="720"></video>
+<div style="display: flex; flex-direction: row; gap: 16px; justify-content: center;">
+  <video
+    src="https://github.com/user-attachments/assets/24683e9f-f7ba-4653-ba21-3566bd409dc4"
+    width="352"
+    height="720"
+  ></video>
+  <video
+    src="https://github.com/user-attachments/assets/3786851d-a7de-42b5-8453-a327b1cef197"
+    width="352"
+    height="720"
+  ></video>
+</div>
+
+
+
+
 
 The workshop consists of **two labs** that build on each other. Work through them in order.
 
