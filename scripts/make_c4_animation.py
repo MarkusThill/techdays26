@@ -1,6 +1,6 @@
-from pathlib import Path
 import time
 import warnings
+from pathlib import Path
 
 import imageio.v2 as imageio
 import numpy as np
@@ -16,8 +16,7 @@ from bitbully.gui_c4 import GuiC4
 
 
 def _fig_to_rgb_array(fig) -> np.ndarray:
-    """
-    Render a Matplotlib figure to an RGB array (H, W, 3, uint8), using
+    """Render a Matplotlib figure to an RGB array (H, W, 3, uint8), using
     FigureCanvasAgg.tostring_argb().
     """
     fig.canvas.draw()
@@ -40,8 +39,7 @@ def generate_c4_animation_mp4(
     max_depth_yellow: int = 4,
     max_depth_red: int = 4,
 ) -> str:
-    """
-    Play an automatic BitBully-vs-BitBully game in GuiC4 and record it as an MP4.
+    """Play an automatic BitBully-vs-BitBully game in GuiC4 and record it as an MP4.
 
     Parameters
     ----------
@@ -58,7 +56,7 @@ def generate_c4_animation_mp4(
     max_depth_red : int
         Search depth for Red BitBully.
 
-    Returns
+    Returns:
     -------
     str
         Path to the created MP4.
