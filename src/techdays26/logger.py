@@ -171,7 +171,8 @@ class TrainingLogger:
 
         # ── Save model snapshot at user-specified steps ──────────────────
         if step in self._snapshot_steps:
-            snap = copy.deepcopy(net).cpu()
+            orig = getattr(net, "_orig_mod", net)
+            snap = copy.deepcopy(orig).cpu()
             snap.eval()
             snap_path = self._dir / f"step_{step}_snapshot.pt"
             snap.save(str(snap_path))
@@ -182,7 +183,8 @@ class TrainingLogger:
             print(f"{pfx}evaluate at step {step}...")
             # Deep-copy onto CPU before any disk or arena work so the training
             # tensors on the original device are never touched by the arena.
-            net_snapshot = copy.deepcopy(net).cpu()
+            orig = getattr(net, "_orig_mod", net)
+            net_snapshot = copy.deepcopy(orig).cpu()
             net_snapshot.eval()
             if self._save_weights:
                 weights_path = str(self._dir / f"step_{step}_model_weights.pt")
