@@ -21,6 +21,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import multiprocessing
 import random
 import time
 from dataclasses import asdict, dataclass, is_dataclass
@@ -83,6 +84,9 @@ class TimeControl:
     per_game_budget_s: float | None = None
 
 
+AgentFactory = dict[str, tuple[type, dict[str, Any]]]
+
+
 @dataclass(frozen=True, slots=True)
 class ArenaConfig:
     """Configuration for running an arena tournament.
@@ -103,6 +107,9 @@ class ArenaConfig:
     log_scores: bool = False
     use_tqdm: bool = False
     logger: logging.Logger | None = None
+
+    n_workers: int = 1
+    agent_factory: AgentFactory | None = None
 
 
 class TerminationReason(str, Enum):
@@ -345,6 +352,31 @@ class RandomAgent:
 
 
 # -----------------------------
+# Multiprocessing worker helpers
+# -----------------------------
+
+_worker_agents: dict[str, Connect4Agent] = {}
+
+
+def _init_worker(factory: AgentFactory) -> None:
+    global _worker_agents
+    _worker_agents = {aid: cls(**kwargs) for aid, (cls, kwargs) in factory.items()}
+
+
+def _worker_play_game(args: tuple) -> GameRecord:
+    game_cfg, time_control, log_scores = args
+    arena = BitBullyArena()
+    return arena._play_one_game(
+        game_cfg=game_cfg,
+        agent_by_id=_worker_agents,
+        time_control=time_control,
+        seed=game_cfg.seed,
+        log_scores=log_scores,
+        logger=logging.getLogger(__name__),
+    )
+
+
+# -----------------------------
 # Arena implementation
 # -----------------------------
 
@@ -495,27 +527,10 @@ class BitBullyArena:
             aid: s.agent for aid, s in spec_by_id.items()
         }
 
-        # Optional progress bar
-        iterator = planned_games
-        if cfg.use_tqdm:
-            try:
-                from tqdm import tqdm  # type: ignore[import-not-found]
-
-                iterator = tqdm(planned_games, desc="BitBullyArena", unit="game")
-            except Exception:
-                iterator = planned_games
-
-        games_out: list[GameRecord] = []
-        for game_cfg in iterator:
-            gr = self._play_one_game(
-                game_cfg=game_cfg,
-                agent_by_id=agent_by_id,
-                time_control=cfg.time_control,
-                seed=game_cfg.seed,
-                log_scores=cfg.log_scores,
-                logger=logger,
-            )
-            games_out.append(gr)
+        if cfg.n_workers > 1 and cfg.agent_factory is not None:
+            games_out = self._run_parallel(planned_games, cfg)
+        else:
+            games_out = self._run_sequential(planned_games, agent_by_id, cfg, logger)
 
         aggregates = _aggregate_games(games_out)
 
@@ -524,6 +539,66 @@ class BitBullyArena:
             aggregates=tuple(aggregates),
             skipped=tuple(skipped),
         )
+
+    @staticmethod
+    def _run_sequential(
+        planned_games: list[GameConfig],
+        agent_by_id: dict[str, Connect4Agent],
+        cfg: ArenaConfig,
+        logger: logging.Logger,
+    ) -> list[GameRecord]:
+        iterator: Any = planned_games
+        if cfg.use_tqdm:
+            try:
+                from tqdm import tqdm  # type: ignore[import-not-found]
+
+                iterator = tqdm(planned_games, desc="BitBullyArena", unit="game")
+            except Exception:
+                pass
+
+        arena = BitBullyArena()
+        games_out: list[GameRecord] = []
+        for game_cfg in iterator:
+            gr = arena._play_one_game(
+                game_cfg=game_cfg,
+                agent_by_id=agent_by_id,
+                time_control=cfg.time_control,
+                seed=game_cfg.seed,
+                log_scores=cfg.log_scores,
+                logger=logger,
+            )
+            games_out.append(gr)
+        return games_out
+
+    @staticmethod
+    def _run_parallel(
+        planned_games: list[GameConfig],
+        cfg: ArenaConfig,
+    ) -> list[GameRecord]:
+        assert cfg.agent_factory is not None
+        work_items = [(gc, cfg.time_control, cfg.log_scores) for gc in planned_games]
+        games_out: list[GameRecord] = []
+        with multiprocessing.Pool(
+            processes=cfg.n_workers,
+            initializer=_init_worker,
+            initargs=(cfg.agent_factory,),
+        ) as pool:
+            results = pool.imap_unordered(_worker_play_game, work_items)
+            if cfg.use_tqdm:
+                try:
+                    from tqdm import tqdm  # type: ignore[import-not-found]
+
+                    results = tqdm(
+                        results,
+                        total=len(planned_games),
+                        desc="BitBullyArena",
+                        unit="game",
+                    )
+                except Exception:
+                    pass
+            for gr in results:
+                games_out.append(gr)
+        return games_out
 
     def _play_one_game(
         self,

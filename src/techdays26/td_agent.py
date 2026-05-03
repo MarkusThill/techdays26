@@ -37,18 +37,37 @@ class TDConnect4AgentTorch:
     # ---- Protocol method 1 ----
     def score_all_moves(self, board) -> dict[int, int]:
         """Return {col: score} for all legal moves. Illegal/full columns are excluded."""
-        player_to_move = board.current_player() - 1  # BitBully: {1,2} -> {0,1}
-        if player_to_move not in (0, 1):
-            raise ValueError(f"Unexpected current_player(): {board.current_player()}")
+        player_to_move = board.current_player()
+        if player_to_move not in (1, 2):
+            raise ValueError(f"Unexpected current_player(): {player_to_move}")
+
+        all_tokens, active_tokens, moves_left = board._board.rawState()
+        batch = BoardBatch(
+            all_tokens=torch.full((7,), all_tokens, dtype=torch.int64),
+            active_tokens=torch.full((7,), active_tokens, dtype=torch.int64),
+            moves_left=torch.full((7,), moves_left, dtype=torch.int64),
+        )
+        columns = torch.arange(7, dtype=torch.int64)
+        legal = batch.play_columns(columns)
+
+        with torch.no_grad():
+            wins = batch.has_win()
+            opp_wins = batch.can_win()
+            net_scores = self._eval.forward(batch)
 
         scores: dict[int, int] = {}
-
         for col in range(7):
-            if not board.is_legal_move(col):
+            if not legal[col]:
                 continue
-
-            score = self.score_move(board=board, column=col)
-            scores[col] = score
+            if wins[col]:
+                scores[col] = 100
+            elif opp_wins[col]:
+                scores[col] = -100
+            else:
+                s = float(net_scores[col].item())
+                if player_to_move == 2:
+                    s = -s
+                scores[col] = int(s * 100.0)
 
         return scores
 
@@ -99,7 +118,8 @@ class TDConnect4AgentTorch:
         if after.can_win_next():
             return -100
 
-        score = float(self._eval.forward(torch_board)[0].item())
+        with torch.no_grad():
+            score = float(self._eval.forward(torch_board)[0].item())
 
         if player_to_move == 2:
             score = -score
