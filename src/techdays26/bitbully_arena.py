@@ -578,7 +578,8 @@ class BitBullyArena:
         assert cfg.agent_factory is not None
         work_items = [(gc, cfg.time_control, cfg.log_scores) for gc in planned_games]
         games_out: list[GameRecord] = []
-        with multiprocessing.Pool(
+        ctx = multiprocessing.get_context("spawn")
+        with ctx.Pool(
             processes=cfg.n_workers,
             initializer=_init_worker,
             initargs=(cfg.agent_factory,),
