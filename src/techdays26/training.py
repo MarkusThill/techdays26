@@ -83,7 +83,7 @@ def _bav_loop(
     dev = board.all_tokens.device
     B = board.all_tokens.shape[0]
 
-    yellow_to_move = (board.moves_left.to(torch.int64) & 1) == 0  # [B] bool
+    yellow_to_move = (board.moves_left & 1) == 0  # [B] bool
 
     neg_inf = torch.tensor(float("-inf"), device=dev)
     pos_inf = torch.tensor(float("inf"), device=dev)
@@ -155,7 +155,7 @@ def _bav_batched(
     dev = board.all_tokens.device
     B = board.all_tokens.shape[0]
 
-    yellow_to_move = (board.moves_left.to(torch.int64) & 1) == 0  # [B] bool
+    yellow_to_move = (board.moves_left & 1) == 0  # [B] bool
     neg_inf = torch.tensor(float("-inf"), device=dev, dtype=torch.float32)
     pos_inf = torch.tensor(float("inf"), device=dev, dtype=torch.float32)
 

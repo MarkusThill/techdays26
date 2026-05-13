@@ -42,7 +42,7 @@ class NTupleNetwork(nn.Module):
         dev = T.device
 
         # Active player per board: 0=Yellow, 1=Red
-        player_idx = ((board.moves_left.to(torch.int64) & 1) != 0).to(torch.int64)
+        player_idx = ((board.moves_left & 1) != 0).to(torch.int64)
 
         # Pattern indices [M]
         m_idx = torch.arange(self.M, device=dev)

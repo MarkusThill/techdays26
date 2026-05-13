@@ -14,7 +14,7 @@ def _i64(x: int) -> int:
 class BoardBatch:
     all_tokens: torch.Tensor  # [B] int64
     active_tokens: torch.Tensor  # [B] int64
-    moves_left: torch.Tensor  # [B] int16/int32
+    moves_left: torch.Tensor  # [B] int64
 
     N_COLUMNS: ClassVar[int] = 7
     N_ROWS: ClassVar[int] = 6
@@ -131,7 +131,7 @@ class BoardBatch:
         reachable = (~occupied) & ((reachable_mask & masks) != 0)  # [B,M,N] bool
 
         # Determine which color is "active player" from moves_left parity (matches your C++)
-        active_is_yellow = (self.moves_left.to(torch.int64) & 1) == 0  # [B] bool
+        active_is_yellow = (self.moves_left & 1) == 0  # [B] bool
 
         # If active is yellow: active tokens are yellow, else active tokens are red.
         yellow = (
@@ -164,7 +164,7 @@ class BoardBatch:
         batch_size: int,
         device: torch.device | str,
         *,
-        moves_left_dtype: torch.dtype = torch.int16,
+        moves_left_dtype: torch.dtype = torch.int64,
     ) -> BoardBatch:
         dev = torch.device(device)
         all_tokens = torch.zeros(batch_size, device=dev, dtype=torch.int64)
@@ -510,7 +510,7 @@ class BoardBatch:
         # moves_left AFTER move:
         # odd -> yellow just moved (yellow starts and places the first token)
         # even  -> red just moved
-        yellow_just_moved = (self.moves_left.to(torch.int64) & 1) == 1
+        yellow_just_moved = (self.moves_left & 1) == 1
 
         # Assign rewards
         r = torch.where(win & yellow_just_moved, torch.tensor(1.0, device=dev), r)
@@ -528,7 +528,7 @@ class BoardBatch:
         dev = self._device_check(self.all_tokens, self.active_tokens, self.moves_left)
 
         # Even moves_left -> Yellow to move
-        yellow_to_move = (self.moves_left.to(torch.int64) & 1) == 0
+        yellow_to_move = (self.moves_left & 1) == 0
 
         return torch.where(
             yellow_to_move,
@@ -545,7 +545,7 @@ class BoardBatch:
         dev = self._device_check(self.all_tokens, self.active_tokens, self.moves_left)
 
         # Even moves_left -> Yellow to move
-        yellow_to_move = (self.moves_left.to(torch.int64) & 1) == 0
+        yellow_to_move = (self.moves_left & 1) == 0
 
         return torch.where(
             yellow_to_move,
