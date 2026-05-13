@@ -5,6 +5,8 @@ import torch.nn as nn
 
 
 class NTupleNetwork(nn.Module):
+    COLUMN_BIT_OFFSET: int = 9
+
     def __init__(self, n_tuple_list: list[list[int]]):
         super().__init__()
 
@@ -17,23 +19,33 @@ class NTupleNetwork(nn.Module):
             "n_tuple_tensor", torch.tensor(n_tuple_list, dtype=torch.int64)
         )
 
+        # Precompute mirrored bit-indices: swap column c -> 6-c
+        # Bit index layout: col * 9 + row
+        off = self.COLUMN_BIT_OFFSET
+        orig = torch.tensor(n_tuple_list, dtype=torch.int64)
+        cols = orig // off
+        rows = orig % off
+        mirrored = (6 - cols) * off + rows
+        self.register_buffer("n_tuple_tensor_2M", torch.cat([orig, mirrored], dim=0))
+
         # Two players × M LUTs × K entries
         # 0 = Yellow, 1 = Red
         self.W = nn.Parameter(torch.zeros(2, self.M, self.K))
 
     def forward(self, board: BoardBatch) -> torch.Tensor:
         """Returns [B] tensor in [-1, 1]."""
-        # [B, M] table indices
-        T = board.table_positions(self.n_tuple_tensor)
-        T_mir = board.mirror().table_positions(self.n_tuple_tensor)
-        B, M = T.shape
+        # [B, 2M] table indices — original + mirrored patterns in one call
+        T_2M = board.table_positions(self.n_tuple_tensor_2M)
+        T = T_2M[:, : self.M]
+        T_mir = T_2M[:, self.M :]
+        B = T.shape[0]
         dev = T.device
 
         # Active player per board: 0=Yellow, 1=Red
         player_idx = ((board.moves_left.to(torch.int64) & 1) != 0).to(torch.int64)
 
         # Pattern indices [M]
-        m_idx = torch.arange(M, device=dev)
+        m_idx = torch.arange(self.M, device=dev)
 
         # Gather: W[player_idx[b], m, T[b,m]]
         w = self.W[
