@@ -26,10 +26,14 @@ class TrainingLogger:
         evaluate_fn:  Callable that accepts either a weights path (str) or a
                       deep-copied CPU NTupleNetwork and returns an ArenaResult.
                       Signature: ``evaluate_fn(weights_path_or_net)``.
-        save_weights: If True (default), save model weights to disk at each
-                      evaluation step and pass the file path to evaluate_fn.
-                      If False, pass a deep-copied CPU snapshot of the network
-                      directly — no disk I/O.
+        save_weights: If True (default), keep ``step_<N>_model_weights.pt`` on
+                      disk after evaluation. If False, do not retain those files
+                      — if a file had to be written (because ``eval_needs_disk``
+                      is True), it is deleted once the arena call returns.
+        eval_needs_disk: If True, the evaluator requires the model on disk
+                      (e.g. multi-worker arena that spawns subprocesses and
+                      can't share an in-memory module). Forces a write per
+                      evaluation step regardless of ``save_weights``.
         save_detailed_arena_results: If True (default), write the full per-step
                       ``step_<N>_arena_result.json`` files containing complete
                       per-game match details. The aggregated scores in
@@ -47,6 +51,7 @@ class TrainingLogger:
         evaluate_fn: Callable[[str | NTupleNetwork], object],
         *,
         save_weights: bool = True,
+        eval_needs_disk: bool = False,
         save_snapshot_steps: list[int] | None = None,
         save_detailed_arena_results: bool = True,
     ) -> None:
@@ -57,6 +62,7 @@ class TrainingLogger:
         self._ri = repeat_idx
         self._eval_fn = evaluate_fn
         self._save_weights = save_weights
+        self._eval_needs_disk = eval_needs_disk
         self._snapshot_steps = set(save_snapshot_steps or [])
         self._save_detailed_arena_results = save_detailed_arena_results
 
@@ -186,13 +192,19 @@ class TrainingLogger:
             orig = getattr(net, "_orig_mod", net)
             net_snapshot = copy.deepcopy(orig).cpu()
             net_snapshot.eval()
-            if self._save_weights:
+            weights_path: str | None = None
+            if self._save_weights or self._eval_needs_disk:
                 weights_path = str(self._dir / f"step_{step}_model_weights.pt")
                 net_snapshot.save(weights_path)
                 eval_arg: str | NTupleNetwork = weights_path
             else:
                 eval_arg = net_snapshot
-            result = self._eval_fn(eval_arg)
+            try:
+                result = self._eval_fn(eval_arg)
+            finally:
+                # Drop the .pt unless the user explicitly asked to keep it.
+                if weights_path is not None and not self._save_weights:
+                    Path(weights_path).unlink(missing_ok=True)
 
             if self._save_detailed_arena_results:
                 result.save_json(str(self._dir / f"step_{step}_arena_result.json"))
