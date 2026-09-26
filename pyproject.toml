@@ -89,6 +89,9 @@ include = ["techdays26*"]  # package names should match these glob patterns (["*
 exclude = ["techdays26.tests*"]  # exclude packages matching these glob patterns (empty by default)
 namespaces = false  # to disable scanning PEP 420 namespaces (true by default)
 
+[tool.setuptools.package-data]
+"techdays26.frozen_lake" = ["img/*.png"]
+
 
 
 [tool.commitizen]
